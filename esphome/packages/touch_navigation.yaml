@@ -128,7 +128,10 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_1_state) = !id(ctrl_1_state);'
+              - lambda: |-
+                  id(ctrl_1_state) = true;
+                  id(ctrl_3_state) = false;
+                  id(ctrl_6_state) = false;
               - homeassistant.service:
                   service: homeassistant.turn_on
                   data:
@@ -196,7 +199,10 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_3_state) = !id(ctrl_3_state);'
+              - lambda: |-
+                  id(ctrl_1_state) = false;
+                  id(ctrl_3_state) = true;
+                  id(ctrl_6_state) = false;
               - homeassistant.service:
                   service: homeassistant.turn_on
                   data:
@@ -304,9 +310,12 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_6_state) = !id(ctrl_6_state);'
+              - lambda: |-
+                  id(ctrl_1_state) = false;
+                  id(ctrl_3_state) = false;
+                  id(ctrl_6_state) = true;
               - homeassistant.service:
-                  service: scene.turn_on
+                  service: homeassistant.turn_on
                   data:
                     entity_id: ${entity_ctrl_6}
               - script.execute: request_screen_refresh

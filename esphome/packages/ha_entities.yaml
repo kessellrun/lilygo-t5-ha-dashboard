@@ -6,87 +6,9 @@
 # ==============================================================================
 
 # ==============================================================================
-# 1. Binary Sensors — Tab 0 Smart Home Controls & OTA Stay-Awake Helper
+# 1. Binary Sensors — Companion OTA Stay-Awake Helper
 # ==============================================================================
 binary_sensor:
-  - platform: homeassistant
-    id: ha_ctrl_1
-    entity_id: ${entity_ctrl_1}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_1_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
-  - platform: homeassistant
-    id: ha_ctrl_2
-    entity_id: ${entity_ctrl_2}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_2_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
-  - platform: homeassistant
-    id: ha_ctrl_3
-    entity_id: ${entity_ctrl_3}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_3_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
-  - platform: homeassistant
-    id: ha_ctrl_4
-    entity_id: ${entity_ctrl_4}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_4_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
-  - platform: homeassistant
-    id: ha_ctrl_5
-    entity_id: ${entity_ctrl_5}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_5_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
-  - platform: homeassistant
-    id: ha_ctrl_6
-    entity_id: ${entity_ctrl_6}
-    trigger_on_initial_state: true
-    on_state:
-      then:
-        - lambda: 'id(ctrl_6_state) = x;'
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 0;'
-            then:
-              - script.execute: request_screen_refresh
-
   # Companion OTA Stay-Awake Helper (`input_boolean.lilygo_t5_stay_awake_ota`)
   - platform: homeassistant
     id: ha_stay_awake_ota
@@ -106,9 +28,105 @@ binary_sensor:
         - script.execute: request_screen_refresh
 
 # ==============================================================================
-# 2. Text Sensors — Weather Condition, 5-Day Compact Forecast CSV, HVAC & Wake
+# 2. Text Sensors — Tab 0 Controls (Supports both Lights/Switches & Scenes),
+#    Weather Condition, 5-Day Compact Forecast CSV, HVAC & Wake
 # ==============================================================================
 text_sensor:
+  - platform: homeassistant
+    id: ha_ctrl_1
+    entity_id: ${entity_ctrl_1}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_1_state)) { id(ctrl_1_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_1_state)) { id(ctrl_1_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
+
+  - platform: homeassistant
+    id: ha_ctrl_2
+    entity_id: ${entity_ctrl_2}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_2_state)) { id(ctrl_2_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_2_state)) { id(ctrl_2_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
+
+  - platform: homeassistant
+    id: ha_ctrl_3
+    entity_id: ${entity_ctrl_3}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_3_state)) { id(ctrl_3_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_3_state)) { id(ctrl_3_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
+
+  - platform: homeassistant
+    id: ha_ctrl_4
+    entity_id: ${entity_ctrl_4}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_4_state)) { id(ctrl_4_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_4_state)) { id(ctrl_4_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
+
+  - platform: homeassistant
+    id: ha_ctrl_5
+    entity_id: ${entity_ctrl_5}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_5_state)) { id(ctrl_5_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_5_state)) { id(ctrl_5_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
+
+  - platform: homeassistant
+    id: ha_ctrl_6
+    entity_id: ${entity_ctrl_6}
+    on_value:
+      then:
+        - lambda: |-
+            bool changed = false;
+            if (x == "on" || x == "ON") {
+              if (!id(ctrl_6_state)) { id(ctrl_6_state) = true; changed = true; }
+            } else if (x == "off" || x == "OFF") {
+              if (id(ctrl_6_state)) { id(ctrl_6_state) = false; changed = true; }
+            }
+            if (changed && id(active_tab) == 0) {
+              id(request_screen_refresh).execute();
+            }
   - platform: homeassistant
     id: ha_weather_condition
     entity_id: ${entity_weather}

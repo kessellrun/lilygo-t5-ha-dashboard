@@ -210,6 +210,7 @@ script:
   - id: request_screen_refresh
     mode: restart
     then:
+      - delay: 300ms
       - lambda: |-
           id(refresh_counter) += 1;
       - component.update: epaper_display
