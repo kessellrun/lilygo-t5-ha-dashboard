@@ -130,7 +130,7 @@ binary_sensor:
             then:
               - lambda: 'id(ctrl_1_state) = !id(ctrl_1_state);'
               - homeassistant.service:
-                  service: homeassistant.toggle
+                  service: homeassistant.turn_on
                   data:
                     entity_id: ${entity_ctrl_1}
               - script.execute: request_screen_refresh
@@ -198,7 +198,7 @@ binary_sensor:
             then:
               - lambda: 'id(ctrl_3_state) = !id(ctrl_3_state);'
               - homeassistant.service:
-                  service: homeassistant.toggle
+                  service: homeassistant.turn_on
                   data:
                     entity_id: ${entity_ctrl_3}
               - script.execute: request_screen_refresh
@@ -245,19 +245,10 @@ binary_sensor:
               lambda: 'return id(active_tab) == 0;'
             then:
               - lambda: 'id(ctrl_4_state) = !id(ctrl_4_state);'
-              - if:
-                  condition:
-                    lambda: 'return id(ha_ctrl_4).state;'
-                  then:
-                    - homeassistant.service:
-                        service: lock.unlock
-                        data:
-                          entity_id: ${entity_ctrl_4}
-                  else:
-                    - homeassistant.service:
-                        service: lock.lock
-                        data:
-                          entity_id: ${entity_ctrl_4}
+              - homeassistant.service:
+                  service: homeassistant.toggle
+                  data:
+                    entity_id: ${entity_ctrl_4}
               - script.execute: request_screen_refresh
         - if:
             condition:
@@ -283,7 +274,7 @@ binary_sensor:
             then:
               - lambda: 'id(ctrl_5_state) = !id(ctrl_5_state);'
               - homeassistant.service:
-                  service: cover.toggle
+                  service: homeassistant.toggle
                   data:
                     entity_id: ${entity_ctrl_5}
               - script.execute: request_screen_refresh

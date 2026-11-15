@@ -97,7 +97,7 @@ substitutions:
   label_room3: "Home Office"
 
   entity_room4_temp: "sensor.decent_espresso_de1pro_de1_head_temperature"
-  #entity_room4_hum: "sensor.kitchen_humidity"
+  entity_room4_hum: "sensor.thermostat_current_humidity"
   label_room4: "DE1+ Grouphead"
 
   entity_indoor_co2: "sensor.indoor_co2_ppm"
@@ -297,4 +297,9 @@ display:
     rotation: 0
     update_interval: never
     lambda: |-
-      epd_ui::render_dashboard(it);
+      epd_ui::DashboardLabels labels = {
+        "${label_ctrl_1}", "${label_ctrl_2}", "${label_ctrl_3}",
+        "${label_ctrl_4}", "${label_ctrl_5}", "${label_ctrl_6}",
+        "${label_room1}",  "${label_room2}",  "${label_room3}", "${label_room4}"
+      };
+      epd_ui::render_dashboard(it, labels);

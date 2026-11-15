@@ -16,6 +16,20 @@ static constexpr int HEADER_H = 56;
 static constexpr int NAVBAR_Y = 476;
 static constexpr int NAVBAR_H = 64;
 
+// Dynamic labels passed from YAML substitutions (${label_ctrl_1..6}, ${label_room1..4})
+struct DashboardLabels {
+  const char *ctrl_1;
+  const char *ctrl_2;
+  const char *ctrl_3;
+  const char *ctrl_4;
+  const char *ctrl_5;
+  const char *ctrl_6;
+  const char *room_1;
+  const char *room_2;
+  const char *room_3;
+  const char *room_4;
+};
+
 // Helper to draw a thick-bordered card with optional inverted active state
 inline void draw_card(esphome::display::Display &it, int x, int y, int w, int h, bool inverted = false, int border_px = 2) {
   if (inverted) {
@@ -193,7 +207,7 @@ inline void render_navbar(esphome::display::Display &it) {
 // ==============================================================================
 // 4. Tab 0: Smart Home Touch Controls (2x3 Interactive Grid + Status Strip)
 // ==============================================================================
-inline void render_tab_controls(esphome::display::Display &it) {
+inline void render_tab_controls(esphome::display::Display &it, const DashboardLabels &labels) {
   struct ControlCard {
     int x;
     int y;
@@ -207,12 +221,12 @@ inline void render_tab_controls(esphome::display::Display &it) {
   };
 
   ControlCard cards[6] = {
-    { 20,  75, "Living Room",    "Main Dimmable Lights", "\U000F0335", "\U000F0336", id(ctrl_1_state), "ON",     "OFF" },
-    {335,  75, "Kitchen Lights", "Island Pendant Group", "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
-    {650,  75, "Office Desk",    "Workstation Power",    "\U000F0425", "\U000F0425", id(ctrl_3_state), "ON",     "OFF" },
-    { 20, 265, "Front Door",     "Smart Deadbolt Lock",  "\U000F033E", "\U000F033F", id(ctrl_4_state), "LOCKED", "UNLOCKED" },
-    {335, 265, "Garage Door",    "Overhead Roll Cover",  "\U000F06DA", "\U000F06D9", id(ctrl_5_state), "OPEN",   "CLOSED" },
-    {650, 265, "Goodnight",      "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
+    { 20,  75, labels.ctrl_1, "Home Assistant Scene", "\U000F07D0", "\U000F07D0", id(ctrl_1_state), "ACTIVE", "TAP TO RUN" },
+    {335,  75, labels.ctrl_2, "Smart Light Group",    "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
+    {650,  75, labels.ctrl_3, "Home Assistant Scene", "\U000F0335", "\U000F0336", id(ctrl_3_state), "ACTIVE", "TAP TO RUN" },
+    { 20, 265, labels.ctrl_4, "Indoor Light Strip",   "\U000F0335", "\U000F0336", id(ctrl_4_state), "ON",     "OFF" },
+    {335, 265, labels.ctrl_5, "Smart Switch Control", "\U000F0425", "\U000F0425", id(ctrl_5_state), "ON",     "OFF" },
+    {650, 265, labels.ctrl_6, "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
   };
 
   int active_count = 0;
@@ -361,23 +375,24 @@ inline void render_tab_weather(esphome::display::Display &it) {
 // ==============================================================================
 // 6. Tab 2: Indoor Climate Matrix (4 Rooms) & HVAC Setpoint Controller
 // ==============================================================================
-inline void render_tab_climate(esphome::display::Display &it) {
+inline void render_tab_climate(esphome::display::Display &it, const DashboardLabels &labels) {
   struct RoomCard {
     int x;
     int y;
     const char *name;
     float temp;
     float hum;
+    bool is_espresso;
   };
   RoomCard rooms[4] = {
-    { 20,  75, "Living Room",     id(ha_room1_temp).state, id(ha_room1_hum).state},
-    {310,  75, "Primary Bedroom", id(ha_room2_temp).state, id(ha_room2_hum).state},
-    { 20, 270, "Home Office",     id(ha_room3_temp).state, id(ha_room3_hum).state},
-    {310, 270, "Kitchen / Study", id(ha_room4_temp).state, id(ha_room4_hum).state}
+    { 20,  75, labels.room_1, id(ha_room1_temp).state, id(ha_room1_hum).state, false},
+    {310,  75, labels.room_2, id(ha_room2_temp).state, id(ha_room2_hum).state, false},
+    { 20, 270, labels.room_3, id(ha_room3_temp).state, id(ha_room3_hum).state, false},
+    {310, 270, labels.room_4, id(ha_room4_temp).state, id(ha_room4_hum).state, true}
   };
 
-  float fallback_t[4] = {71.4f, 68.8f, 73.1f, 70.5f};
-  float fallback_h[4] = {44.0f, 48.0f, 41.0f, 46.0f};
+  float fallback_t[4] = {71.4f, 68.8f, 73.1f, 198.5f};
+  float fallback_h[4] = {44.0f, 48.0f, 41.0f, 0.0f};
 
   for (int i = 0; i < 4; i++) {
     float rt = isnan(rooms[i].temp) ? fallback_t[i] : rooms[i].temp;
@@ -387,13 +402,21 @@ inline void render_tab_climate(esphome::display::Display &it) {
     it.print(rooms[i].x + 18, rooms[i].y + 16, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
              rooms[i].name);
     it.printf(rooms[i].x + 18, rooms[i].y + 54, &id(font_bold_36), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-              "%.1f°F", rt);
-    it.printf(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-              "Humidity: %.0f%%", rh);
+              "%.1f°", rt);
 
-    const char *comfort = (rt >= 67.0f && rt <= 74.0f && rh >= 35.0f && rh <= 55.0f) ? "OPTIMAL COMFORT" : "CHECK ZONE";
-    it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-             comfort);
+    if (rooms[i].is_espresso) {
+      it.print(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+               "Decent DE1Pro Head");
+      const char *brew_state = (!isnan(rooms[i].temp) && rooms[i].temp > 175.0f) ? "BREW TEMP READY" : "STANDBY / WARMING";
+      it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+               brew_state);
+    } else {
+      it.printf(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+                "Humidity: %.0f%%", rh);
+      const char *comfort = (rt >= 67.0f && rt <= 74.0f && rh >= 35.0f && rh <= 55.0f) ? "OPTIMAL COMFORT" : "CHECK ZONE";
+      it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+               comfort);
+    }
   }
 
   // Right HVAC & Air Quality Panel (x: 600..940, y: 75..455)
@@ -536,7 +559,7 @@ inline void render_tab_power(esphome::display::Display &it) {
 // ==============================================================================
 // 8. Main Entrypoint Called from `display:` Lambda in lilygo-t5-h716-dashboard.yaml
 // ==============================================================================
-inline void render_dashboard(esphome::display::Display &it) {
+inline void render_dashboard(esphome::display::Display &it, const DashboardLabels &labels) {
   it.fill(esphome::display::COLOR_OFF);
 
   // Check for Critical Low-Battery Cutoff (< 3.32V when running on LiPo)
@@ -550,13 +573,13 @@ inline void render_dashboard(esphome::display::Display &it) {
 
   switch (id(active_tab)) {
     case 0:
-      render_tab_controls(it);
+      render_tab_controls(it, labels);
       break;
     case 1:
       render_tab_weather(it);
       break;
     case 2:
-      render_tab_climate(it);
+      render_tab_climate(it, labels);
       break;
     case 3:
     default:
@@ -565,6 +588,16 @@ inline void render_dashboard(esphome::display::Display &it) {
   }
 
   render_navbar(it);
+}
+
+// Backwards-compatible overload with default labels
+inline void render_dashboard(esphome::display::Display &it) {
+  DashboardLabels defaults = {
+    "Living Room TV", "Kitchen Lights", "Evening Lights",
+    "Bookshelf Lights", "Wave Light", "Goodnight",
+    "Living Room", "Hallway", "Home Office", "DE1+ Grouphead"
+  };
+  render_dashboard(it, defaults);
 }
 
 } // namespace epd_ui

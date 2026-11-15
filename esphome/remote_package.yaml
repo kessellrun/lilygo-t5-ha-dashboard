@@ -2,9 +2,70 @@
 # Remote Git Package Entrypoint for LilyGo T5 4.7" [H716] Dashboard
 # ==============================================================================
 # This file allows your local `/config/esphome/lilygo-t5-h716-dashboard.yaml`
-# to pull all packages, C++ UI headers (`include/epd_dashboard_ui.h`), and
-# TrueType fonts (`fonts/*.ttf`) directly from GitHub on every compile!
+# to pull all substitutions, packages, C++ UI headers (`include/epd_dashboard_ui.h`),
+# and TrueType fonts (`fonts/*.ttf`) directly from GitHub on every compile!
 # ==============================================================================
+
+substitutions:
+  device_name: "lilygo-t5-h716-dashboard"
+  friendly_name: "LilyGo T5 4.7 E-Paper Dashboard"
+  use_imperial: "true"
+  temp_unit: "°F"
+  speed_unit: "mph"
+  use_12h_clock: "true"
+  vbat_warn: "3.45"
+  vbat_critical: "3.32"
+  hybrid_sleep_soc_threshold: "35"
+  inactivity_timeout_sec: "90"
+  quiet_start_hour: "23"
+  quiet_end_hour: "6"
+
+  # Tab 0: Smart Home Touch Controls (2x3)
+  entity_ctrl_1: "scene.living_room_tv"
+  label_ctrl_1: "Living Room TV"
+
+  entity_ctrl_2: "light.kitchen_lights"
+  label_ctrl_2: "Kitchen Lights"
+
+  entity_ctrl_3: "scene.evening_lights"
+  label_ctrl_3: "Evening Lights"
+
+  entity_ctrl_4: "light.cync_indoor_light_strip_16ft_2"
+  label_ctrl_4: "Bookshelf Lights"
+
+  entity_ctrl_5: "switch.living_room_light"
+  label_ctrl_5: "Wave Light"
+
+  entity_ctrl_6: "scene.bed_time"
+  label_ctrl_6: "Goodnight"
+
+  entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
+  entity_power_profile: "input_select.lilygo_t5_power_profile"
+
+  # Tab 1: Weather & 5-Day Forecast
+  entity_weather: "weather.forecast_home"
+  entity_weather_forecast_csv: "sensor.lilygo_t5_weather_forecast_compact"
+
+  # Tab 2: Indoor Climate & HVAC Matrix
+  entity_room1_temp: "sensor.living_room_temperature"
+  entity_room1_hum: "sensor.thermostat_current_humidity"
+  label_room1: "Living Room"
+
+  entity_room2_temp: "sensor.thermostat_current_temperature"
+  entity_room2_hum: "sensor.thermostat_current_humidity"
+  label_room2: "Hallway"
+
+  entity_room3_temp: "sensor.office_temperature"
+  entity_room3_hum: "sensor.thermostat_current_humidity"
+  label_room3: "Home Office"
+
+  entity_room4_temp: "sensor.decent_espresso_de1pro_de1_head_temperature"
+  entity_room4_hum: "sensor.thermostat_current_humidity"
+  label_room4: "DE1+ Grouphead"
+
+  entity_indoor_co2: "sensor.indoor_co2_ppm"
+  entity_indoor_aqi: "sensor.indoor_air_quality_index"
+  entity_hvac: "climate.thermostat"
 
 esphome:
   name: ${device_name}
@@ -181,4 +242,9 @@ display:
     rotation: 0
     update_interval: never
     lambda: |-
-      epd_ui::render_dashboard(it);
+      epd_ui::DashboardLabels labels = {
+        "${label_ctrl_1}", "${label_ctrl_2}", "${label_ctrl_3}",
+        "${label_ctrl_4}", "${label_ctrl_5}", "${label_ctrl_6}",
+        "${label_room1}",  "${label_room2}",  "${label_room3}", "${label_room4}"
+      };
+      epd_ui::render_dashboard(it, labels);
