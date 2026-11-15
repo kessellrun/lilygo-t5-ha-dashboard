@@ -53,22 +53,22 @@ substitutions:
   # 5. Home Assistant Entity Mapping — Tab 0: Smart Home Touch Controls (2x3)
   #    Replace these entity IDs with your own Home Assistant entities.
   # ----------------------------------------------------------------------------
-  entity_ctrl_1: "light.living_room_main"
-  label_ctrl_1: "Living Room"
+  entity_ctrl_1: "scene.living_room_tv"
+  label_ctrl_1: "Living Room TV"
 
-  entity_ctrl_2: "light.kitchen_pendant"
+  entity_ctrl_2: "light.kitchen_lights"
   label_ctrl_2: "Kitchen Lights"
 
-  entity_ctrl_3: "switch.office_desk_power"
-  label_ctrl_3: "Office Desk"
+  entity_ctrl_3: "scene.evening_lights"
+  label_ctrl_3: "Evening Lights"
 
-  entity_ctrl_4: "lock.front_door"
-  label_ctrl_4: "Front Door"
+  entity_ctrl_4: "light.cync_indoor_light_strip_16ft_2"
+  label_ctrl_4: "Bookshelf Lights"
 
-  entity_ctrl_5: "cover.garage_door"
-  label_ctrl_5: "Garage Door"
+  entity_ctrl_5: "switch.living_room_light"
+  label_ctrl_5: "Wave Light"
 
-  entity_ctrl_6: "scene.goodnight_house"
+  entity_ctrl_6: "scene.bed_time"
   label_ctrl_6: "Goodnight"
 
   # Companion Helper Entities (defined in homeassistant/packages/lilygo_t5_dashboard.yaml)
@@ -85,24 +85,24 @@ substitutions:
   # 7. Home Assistant Entity Mapping — Tab 2: Indoor Climate & HVAC Matrix
   # ----------------------------------------------------------------------------
   entity_room1_temp: "sensor.living_room_temperature"
-  entity_room1_hum: "sensor.living_room_humidity"
+  entity_room1_hum: "sensor.thermostat_current_humidity"
   label_room1: "Living Room"
 
-  entity_room2_temp: "sensor.primary_bedroom_temperature"
-  entity_room2_hum: "sensor.primary_bedroom_humidity"
-  label_room2: "Primary Bedroom"
+  entity_room2_temp: "sensor.thermostat_current_temperature"
+  entity_room2_hum: "sensor.thermostat_current_humidity"
+  label_room2: "Hallway"
 
-  entity_room3_temp: "sensor.home_office_temperature"
-  entity_room3_hum: "sensor.home_office_humidity"
+  entity_room3_temp: "sensor.office_temperature"
+  entity_room3_hum: "sensor.thermostat_current_humidity"
   label_room3: "Home Office"
 
-  entity_room4_temp: "sensor.kitchen_temperature"
-  entity_room4_hum: "sensor.kitchen_humidity"
-  label_room4: "Kitchen / Nursery"
+  entity_room4_temp: "sensor.decent_espresso_de1pro_de1_head_temperature"
+  #entity_room4_hum: "sensor.kitchen_humidity"
+  label_room4: "DE1+ Grouphead"
 
   entity_indoor_co2: "sensor.indoor_co2_ppm"
   entity_indoor_aqi: "sensor.indoor_air_quality_index"
-  entity_hvac: "climate.main_thermostat"
+  entity_hvac: "climate.thermostat"
 
 # ==============================================================================
 # Core ESPHome Configuration & C++ UI Renderer Header
