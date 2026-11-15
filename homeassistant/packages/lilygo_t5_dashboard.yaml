@@ -1,0 +1,196 @@
+# ==============================================================================
+# HOME ASSISTANT COMPANION PACKAGE: LilyGo T5 4.7" E-Paper Touch [H716]
+# ==============================================================================
+# File location in Home Assistant:
+#   /config/packages/lilygo_t5_dashboard.yaml
+#
+# Prerequisite in /config/configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# What this package provides:
+#   1. input_boolean.lilygo_t5_stay_awake_ota
+#      - Locks the LilyGo T5 [H716] awake on Wi-Fi so you can push wireless
+#        Over-The-Air (OTA) firmware updates even when running on a LiPo battery.
+#   2. input_select.lilygo_t5_power_profile
+#      - Lets you switch between the 3 battery management profiles directly from
+#        Home Assistant ("Adaptive Hybrid (Recommended)", "Always Online (Modem Sleep)",
+#        and "Max Battery (Deep Sleep + Touch Wake)").
+#   3. input_number.lilygo_t5_quiet_hours_start & input_number.lilygo_t5_quiet_hours_end
+#      - Configures overnight Quiet Hours (default 23:00 to 06:00) during which
+#        the display automatically enters Touch-Armed Deep Sleep to save battery.
+#   4. sensor.lilygo_t5_weather_forecast_compact
+#      - Trigger-based template sensor using Home Assistant's modern
+#        `weather.get_forecasts` action (compatible with HA 2024.3+ where legacy
+#        forecast attributes were removed). Serializes 5 days of daily forecast
+#        into a lightweight "Day|Condition|High|Low;..." string (< 120 chars)
+#        so the ESP32-S3 parses it in C++ with zero JSON heap overhead.
+#   5. Battery & OTA Safety Automations
+#      - Sends persistent/mobile notifications at Low Battery (< 20% / < 3.68V)
+#        and Critical Hibernate (< 5% / < 3.32V), plus a 2-hour safety timeout
+#        for OTA Stay-Awake mode so your battery never drains accidentally.
+# ==============================================================================
+
+input_boolean:
+  lilygo_t5_stay_awake_ota:
+    name: "LilyGo T5 Stay Awake for OTA Update"
+    icon: mdi:cellphone-arrow-down
+
+input_select:
+  lilygo_t5_power_profile:
+    name: "LilyGo T5 LiPo Power Profile"
+    icon: mdi:battery-sync
+    options:
+      - "Adaptive Hybrid (Recommended)"
+      - "Always Online (Modem Sleep)"
+      - "Max Battery (Deep Sleep + Touch Wake)"
+    initial: "Adaptive Hybrid (Recommended)"
+
+input_number:
+  lilygo_t5_quiet_hours_start:
+    name: "LilyGo T5 Quiet Hours Start (24h)"
+    icon: mdi:weather-night
+    min: 0
+    max: 23
+    step: 1
+    initial: 23
+    mode: box
+    unit_of_measurement: "h"
+
+  lilygo_t5_quiet_hours_end:
+    name: "LilyGo T5 Quiet Hours End (24h)"
+    icon: mdi:weather-sunset-up
+    min: 0
+    max: 23
+    step: 1
+    initial: 6
+    mode: box
+    unit_of_measurement: "h"
+
+# ------------------------------------------------------------------------------
+# COMPACT 5-DAY WEATHER FORECAST SERIALIZER (HA 2024.3+ weather.get_forecasts)
+# ------------------------------------------------------------------------------
+# IMPORTANT: If your primary weather entity in Home Assistant is not named
+# `weather.forecast_home`, replace `weather.forecast_home` below with your own
+# weather entity ID (for example: `weather.home` or `weather.pirateweather`).
+# ------------------------------------------------------------------------------
+template:
+  - trigger:
+      - platform: time_pattern
+        minutes: "/15"
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id: weather.forecast_home
+    action:
+      - action: weather.get_forecasts
+        target:
+          entity_id: weather.forecast_home
+        data:
+          type: daily
+        response_variable: daily_forecast_data
+    sensor:
+      - name: "LilyGo T5 Weather Forecast Compact"
+        unique_id: lilygo_t5_weather_forecast_compact
+        icon: mdi:weather-partly-cloudy
+        state: >-
+          {% set entity_key = 'weather.forecast_home' %}
+          {% set fc_list = daily_forecast_data.get(entity_key, {}).get('forecast', []) %}
+          {% if fc_list | count > 0 %}
+            {% set ns = namespace(items=[]) %}
+            {% for day in fc_list[:5] %}
+              {% set dt = as_datetime(day.datetime) %}
+              {% set day_name = dt.strftime('%a') if dt is not none else 'Day' ~ loop.index %}
+              {% set cond = (day.condition | default('cloudy')) | replace('_', '-') %}
+              {% set hi = (day.temperature | default(0)) | round(0) | int %}
+              {% set lo = (day.templow | default(hi - 10)) | round(0) | int %}
+              {% set entry = day_name ~ '|' ~ cond ~ '|' ~ hi ~ '|' ~ lo %}
+              {% set ns.items = ns.items + [entry] %}
+            {% endfor %}
+            {{ ns.items | join(';') }}
+          {% else %}
+            Mon|sunny|74|56;Tue|partlycloudy|76|58;Wed|cloudy|71|54;Thu|rainy|67|51;Fri|sunny|75|55
+          {% endif %}
+        attributes:
+          source_weather_entity: "weather.forecast_home"
+          format_schema: "Day|Condition|High|Low;Day|Condition|High|Low (5 days)"
+          last_serialized: "{{ now().isoformat() }}"
+
+# ------------------------------------------------------------------------------
+# AUTOMATIONS: LIPO BATTERY PROTECTION & OTA STAY-AWAKE MANAGEMENT
+# ------------------------------------------------------------------------------
+automation:
+  - id: lilygo_t5_low_battery_warning
+    alias: "LilyGo T5 [H716] - Low LiPo Battery Warning (< 20% or < 3.68V)"
+    description: "Notifies when the 1S LiPo battery drops below 20% SoC or 3.68V so you can plug in USB-C."
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_level
+        below: 20
+        for:
+          minutes: 5
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        below: 3.68
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: binary_sensor.lilygo_t5_h716_dashboard_lipo_charging_status
+        state: "off"
+    action:
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_battery_warning"
+          title: "LilyGo T5 E-Paper: Low LiPo Battery"
+          message: >-
+            The LilyGo T5 4.7" E-Paper display battery is down to
+            {{ states('sensor.lilygo_t5_h716_dashboard_lipo_battery_level') }}%
+            ({{ states('sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage') }}V).
+            Adaptive Hybrid mode has shifted the panel into Touch-Armed Deep Sleep
+            between 15-minute updates. Please recharge via USB-C soon.
+    mode: single
+
+  - id: lilygo_t5_critical_battery_hibernate_alert
+    alias: "LilyGo T5 [H716] - Critical LiPo Battery Hibernate Alert (< 5% or < 3.32V)"
+    description: "Urgent alert when the 1S LiPo cell hits the 3.32V cutoff and the ESP32-S3 locks into Hibernate."
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_level
+        below: 5
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        below: 3.32
+    action:
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_battery_critical"
+          title: "URGENT: LilyGo T5 Entered Critical Battery Hibernate"
+          message: >-
+            The LilyGo T5 4.7" [H716] LiPo cell reached {{ states('sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage') }}V
+            (below the 3.32V safety threshold). To protect the 1S LiPo pouch cell from
+            over-discharge damage, the display has rendered its low-battery lock screen
+            and entered indefinite deep sleep. Connect a USB-C cable to recharge and wake it.
+    mode: single
+
+  - id: lilygo_t5_ota_stay_awake_safety_timeout
+    alias: "LilyGo T5 [H716] - Auto-Disable Stay Awake OTA After 2 Hours"
+    description: "Prevents accidental LiPo battery drain if Stay Awake for OTA is left enabled."
+    trigger:
+      - platform: state
+        entity_id: input_boolean.lilygo_t5_stay_awake_ota
+        to: "on"
+        for:
+          hours: 2
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.lilygo_t5_stay_awake_ota
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_ota_timeout"
+          title: "LilyGo T5: OTA Stay-Awake Auto-Disabled"
+          message: >-
+            `input_boolean.lilygo_t5_stay_awake_ota` was automatically turned off after
+            2 hours to preserve your 1S LiPo battery.
+    mode: single

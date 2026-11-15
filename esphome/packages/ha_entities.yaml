@@ -1,0 +1,279 @@
+# ==============================================================================
+# Home Assistant Entity Subscriptions & System Diagnostic Sensors
+# ==============================================================================
+# Maps Home Assistant entities configured in `lilygo-t5-h716-dashboard.yaml`
+# substitutions to internal ESPHome IDs consumed by `epd_dashboard_ui.h`.
+# ==============================================================================
+
+# ==============================================================================
+# 1. Binary Sensors — Tab 0 Smart Home Controls & OTA Stay-Awake Helper
+# ==============================================================================
+binary_sensor:
+  - platform: homeassistant
+    id: ha_ctrl_1
+    entity_id: ${entity_ctrl_1}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_ctrl_2
+    entity_id: ${entity_ctrl_2}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_ctrl_3
+    entity_id: ${entity_ctrl_3}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_ctrl_4
+    entity_id: ${entity_ctrl_4}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_ctrl_5
+    entity_id: ${entity_ctrl_5}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_ctrl_6
+    entity_id: ${entity_ctrl_6}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 0;'
+            then:
+              - script.execute: request_screen_refresh
+
+  # Companion OTA Stay-Awake Helper (`input_boolean.lilygo_t5_stay_awake_ota`)
+  - platform: homeassistant
+    id: ha_stay_awake_ota
+    entity_id: ${entity_stay_awake_ota}
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return x;'
+            then:
+              - logger.log: "OTA Stay-Awake helper enabled in Home Assistant — Deep Sleep locked out"
+              - deep_sleep.prevent: deep_sleep_ctrl
+            else:
+              - logger.log: "OTA Stay-Awake helper disabled — resuming normal power management"
+              - deep_sleep.allow: deep_sleep_ctrl
+        - script.execute: request_screen_refresh
+
+# ==============================================================================
+# 2. Text Sensors — Weather Condition, 5-Day Compact Forecast CSV, HVAC & Wake
+# ==============================================================================
+text_sensor:
+  - platform: homeassistant
+    id: ha_weather_condition
+    entity_id: ${entity_weather}
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 1;'
+            then:
+              - script.execute: request_screen_refresh
+
+  # Compact 5-Day Forecast String: "Day|Cond|Hi|Lo;Day|Cond|Hi|Lo;..."
+  # Produced by `sensor.lilygo_t5_weather_forecast_compact` in Home Assistant
+  - platform: homeassistant
+    id: ha_weather_forecast_csv
+    entity_id: ${entity_weather_forecast_csv}
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 1;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_hvac_mode
+    entity_id: ${entity_hvac}
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 2;'
+            then:
+              - script.execute: request_screen_refresh
+
+  - platform: homeassistant
+    id: ha_hvac_action
+    entity_id: ${entity_hvac}
+    attribute: hvac_action
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 2;'
+            then:
+              - script.execute: request_screen_refresh
+
+  # Sync Power Profile from Home Assistant `input_select.lilygo_t5_power_profile`
+  - platform: homeassistant
+    id: ha_power_profile_select
+    entity_id: ${entity_power_profile}
+    on_value:
+      then:
+        - lambda: |-
+            if (x.find("Always") != std::string::npos) {
+              id(power_mode_index) = 0;
+            } else if (x.find("Max") != std::string::npos || x.find("Deep") != std::string::npos) {
+              id(power_mode_index) = 2;
+            } else {
+              id(power_mode_index) = 1;
+            }
+        - script.execute: request_screen_refresh
+
+  # Diagnostic Wake Reason reported to Home Assistant and rendered on Tab 3
+  - platform: template
+    id: wake_reason_text
+    name: "Last Wakeup Cause"
+    icon: "mdi:power-sleep"
+    update_interval: never
+
+# ==============================================================================
+# 3. Numeric Sensors — Weather Metrics, 4-Room Climate Matrix, Air Quality & System
+# ==============================================================================
+sensor:
+  # --- Tab 1: Outdoor Weather Attributes ---
+  - platform: homeassistant
+    id: ha_weather_temp
+    entity_id: ${entity_weather}
+    attribute: temperature
+
+  - platform: homeassistant
+    id: ha_weather_feels_like
+    entity_id: ${entity_weather}
+    attribute: apparent_temperature
+
+  - platform: homeassistant
+    id: ha_weather_humidity
+    entity_id: ${entity_weather}
+    attribute: humidity
+
+  - platform: homeassistant
+    id: ha_weather_wind_speed
+    entity_id: ${entity_weather}
+    attribute: wind_speed
+
+  - platform: homeassistant
+    id: ha_weather_uv
+    entity_id: ${entity_weather}
+    attribute: uv_index
+
+  - platform: homeassistant
+    id: ha_weather_pressure
+    entity_id: ${entity_weather}
+    attribute: pressure
+
+  # --- Tab 2: 4-Room Indoor Climate Matrix ---
+  - platform: homeassistant
+    id: ha_room1_temp
+    entity_id: ${entity_room1_temp}
+
+  - platform: homeassistant
+    id: ha_room1_hum
+    entity_id: ${entity_room1_hum}
+
+  - platform: homeassistant
+    id: ha_room2_temp
+    entity_id: ${entity_room2_temp}
+
+  - platform: homeassistant
+    id: ha_room2_hum
+    entity_id: ${entity_room2_hum}
+
+  - platform: homeassistant
+    id: ha_room3_temp
+    entity_id: ${entity_room3_temp}
+
+  - platform: homeassistant
+    id: ha_room3_hum
+    entity_id: ${entity_room3_hum}
+
+  - platform: homeassistant
+    id: ha_room4_temp
+    entity_id: ${entity_room4_temp}
+
+  - platform: homeassistant
+    id: ha_room4_hum
+    entity_id: ${entity_room4_hum}
+
+  # --- Tab 2: Indoor Air Quality & Thermostat Setpoints ---
+  - platform: homeassistant
+    id: ha_indoor_co2
+    entity_id: ${entity_indoor_co2}
+
+  - platform: homeassistant
+    id: ha_indoor_aqi
+    entity_id: ${entity_indoor_aqi}
+
+  - platform: homeassistant
+    id: ha_hvac_current_temp
+    entity_id: ${entity_hvac}
+    attribute: current_temperature
+
+  - platform: homeassistant
+    id: ha_hvac_target_temp
+    entity_id: ${entity_hvac}
+    attribute: temperature
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 2;'
+            then:
+              - script.execute: request_screen_refresh
+
+  # --- Tab 3: On-Device Diagnostics ---
+  - platform: wifi_signal
+    id: wifi_rssi
+    name: "Wi-Fi Signal RSSI"
+    update_interval: 30s
+
+  - platform: uptime
+    id: uptime_sec
+    name: "Awake Session Uptime"
+    update_interval: 30s

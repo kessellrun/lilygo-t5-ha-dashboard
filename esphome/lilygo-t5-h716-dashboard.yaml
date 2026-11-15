@@ -1,0 +1,299 @@
+# ==============================================================================
+# LilyGo T5 4.7-Inch E-Paper Touch [H716] — Home Assistant & LiPo Smart Dashboard
+# ==============================================================================
+# Hardware SKU : LilyGo T5 4.7-inch E-Paper Non-Soldered Female Pin [H716]
+# SoC / Memory : ESP32-S3-WROOM-1-N16R8 (16MB Quad Flash, 8MB Octal PSRAM)
+# Display      : ED047TC1 4.7" E-Ink (960 x 540 pixels, 16-level Grayscale)
+# Touch Panel  : GT911 Capacitive Touch (I2C SDA=GPIO17, SCL=GPIO18, INT=GPIO16)
+# Onboard RTC  : PCF8563 Real-Time Clock (I2C 0x51, SDA=GPIO17, SCL=GPIO18)
+# Battery ADC  : GPIO14 (Internal 2:1 Voltage Divider -> 1S 3.7V LiPo Connector)
+# ==============================================================================
+
+substitutions:
+  # ----------------------------------------------------------------------------
+  # 1. Device Identity & Network Settings
+  # ----------------------------------------------------------------------------
+  device_name: "lilygo-t5-h716-dashboard"
+  friendly_name: "LilyGo T5 4.7 E-Paper Dashboard"
+
+  # ----------------------------------------------------------------------------
+  # 2. Regional & Unit Defaults (Imperial US Defaults: °F, mph, 12-hour clock)
+  #    Set use_imperial to "false", temp_unit to "°C", speed_unit to "km/h",
+  #    and use_12h_clock to "false" for Metric / 24-hour display.
+  # ----------------------------------------------------------------------------
+  use_imperial: "true"
+  temp_unit: "°F"
+  speed_unit: "mph"
+  use_12h_clock: "true"
+
+  # ----------------------------------------------------------------------------
+  # 3. 1S LiPo Battery & Adaptive Hybrid Power Management Thresholds
+  # ----------------------------------------------------------------------------
+  # Voltage threshold for Low Battery warning icon & HA alert (3.45V ~= 7% SoC)
+  vbat_warn: "3.45"
+  # Critical over-discharge cutoff voltage (3.32V). Below this, the display
+  # renders a lock screen and enters indefinite Deep Sleep with timer disabled.
+  vbat_critical: "3.32"
+  # State-of-Charge (%) threshold where Adaptive Hybrid mode switches from
+  # active daytime modem-sleep to Touch-Armed Deep Sleep to conserve battery.
+  hybrid_sleep_soc_threshold: "35"
+  # Seconds of touch inactivity before Adaptive Hybrid mode evaluates sleep
+  inactivity_timeout_sec: "90"
+
+  # ----------------------------------------------------------------------------
+  # 4. Quiet Hours (Overnight Deep Sleep Window in 24-Hour Local Time)
+  #    Between quiet_start_hour (23:00 / 11 PM) and quiet_end_hour (06:00 / 6 AM),
+  #    Adaptive Hybrid mode puts the panel into Touch-Armed Deep Sleep.
+  # ----------------------------------------------------------------------------
+  quiet_start_hour: "23"
+  quiet_end_hour: "6"
+
+  # ----------------------------------------------------------------------------
+  # 5. Home Assistant Entity Mapping — Tab 0: Smart Home Touch Controls (2x3)
+  #    Replace these entity IDs with your own Home Assistant entities.
+  # ----------------------------------------------------------------------------
+  entity_ctrl_1: "light.living_room_main"
+  label_ctrl_1: "Living Room"
+
+  entity_ctrl_2: "light.kitchen_pendant"
+  label_ctrl_2: "Kitchen Lights"
+
+  entity_ctrl_3: "switch.office_desk_power"
+  label_ctrl_3: "Office Desk"
+
+  entity_ctrl_4: "lock.front_door"
+  label_ctrl_4: "Front Door"
+
+  entity_ctrl_5: "cover.garage_door"
+  label_ctrl_5: "Garage Door"
+
+  entity_ctrl_6: "scene.goodnight_house"
+  label_ctrl_6: "Goodnight"
+
+  # Companion Helper Entities (defined in homeassistant/packages/lilygo_t5_dashboard.yaml)
+  entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
+  entity_power_profile: "input_select.lilygo_t5_power_profile"
+
+  # ----------------------------------------------------------------------------
+  # 6. Home Assistant Entity Mapping — Tab 1: Weather & 5-Day Forecast
+  # ----------------------------------------------------------------------------
+  entity_weather: "weather.forecast_home"
+  entity_weather_forecast_csv: "sensor.lilygo_t5_weather_forecast_compact"
+
+  # ----------------------------------------------------------------------------
+  # 7. Home Assistant Entity Mapping — Tab 2: Indoor Climate & HVAC Matrix
+  # ----------------------------------------------------------------------------
+  entity_room1_temp: "sensor.living_room_temperature"
+  entity_room1_hum: "sensor.living_room_humidity"
+  label_room1: "Living Room"
+
+  entity_room2_temp: "sensor.primary_bedroom_temperature"
+  entity_room2_hum: "sensor.primary_bedroom_humidity"
+  label_room2: "Primary Bedroom"
+
+  entity_room3_temp: "sensor.home_office_temperature"
+  entity_room3_hum: "sensor.home_office_humidity"
+  label_room3: "Home Office"
+
+  entity_room4_temp: "sensor.kitchen_temperature"
+  entity_room4_hum: "sensor.kitchen_humidity"
+  label_room4: "Kitchen / Nursery"
+
+  entity_indoor_co2: "sensor.indoor_co2_ppm"
+  entity_indoor_aqi: "sensor.indoor_air_quality_index"
+  entity_hvac: "climate.main_thermostat"
+
+# ==============================================================================
+# Core ESPHome Configuration & C++ UI Renderer Header
+# ==============================================================================
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "LilyGo T5 4.7 E-Paper [H716] Touch & LiPo Dashboard for Home Assistant"
+  includes:
+    - include/epd_dashboard_ui.h
+  on_boot:
+    priority: 250.0
+    then:
+      - lambda: |-
+          // Determine ESP32-S3 wakeup cause for diagnostics & power management
+          auto cause = esp_sleep_get_wakeup_cause();
+          if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
+            id(wake_reason_text).publish_state("GPIO16 Touch Interrupt");
+          } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+            id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
+          } else {
+            id(wake_reason_text).publish_state("Cold Boot / USB Reset");
+          }
+          id(last_touch_ms) = millis();
+      - delay: 2s
+      - script.execute: request_screen_refresh
+
+# ==============================================================================
+# Modular Firmware Packages
+# ==============================================================================
+packages:
+  hardware_h716: !include packages/hardware_h716.yaml
+  lipo_power_manager: !include packages/lipo_power_manager.yaml
+  ha_entities: !include packages/ha_entities.yaml
+  touch_navigation: !include packages/touch_navigation.yaml
+
+# ==============================================================================
+# Home Assistant Native API, OTA Updates & Logging
+# ==============================================================================
+logger:
+  level: INFO
+  baud_rate: 115200
+
+api:
+  id: ha_api
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    id: esphome_ota
+    password: !secret ota_password
+    on_begin:
+      then:
+        - logger.log: "OTA Firmware Update Started — preventing Deep Sleep"
+        - deep_sleep.prevent: deep_sleep_ctrl
+
+# ==============================================================================
+# Typography & Material Design Icons (Place .ttf files in esphome/fonts/)
+# See esphome/fonts/README.md for direct download links and codepoint reference.
+# ==============================================================================
+font:
+  - file: "fonts/Roboto-Regular.ttf"
+    id: font_regular_14
+    size: 14
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_14
+    size: 14
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: font_regular_18
+    size: 18
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_18
+    size: 18
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_24
+    size: 24
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_36
+    size: 36
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_48
+    size: 48
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  # Material Design Icons (MDI) — sizes 22, 32, 48
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_22
+    size: 22
+    glyphs:
+      - "\U000F0599" # mdi-weather-sunny
+      - "\U000F0590" # mdi-weather-cloudy
+      - "\U000F0595" # mdi-weather-partly-cloudy
+      - "\U000F0597" # mdi-weather-rainy
+      - "\U000F0596" # mdi-weather-pouring
+      - "\U000F0593" # mdi-weather-lightning
+      - "\U000F0598" # mdi-weather-snowy
+      - "\U000F059D" # mdi-weather-windy
+      - "\U000F0594" # mdi-weather-night
+      - "\U000F0335" # mdi-lightbulb-on
+      - "\U000F0336" # mdi-lightbulb-outline
+      - "\U000F08DD" # mdi-ceiling-light
+      - "\U000F0425" # mdi-power-plug
+      - "\U000F033E" # mdi-lock
+      - "\U000F033F" # mdi-lock-open
+      - "\U000F06D9" # mdi-garage
+      - "\U000F06DA" # mdi-garage-open
+      - "\U000F050F" # mdi-thermometer
+      - "\U000F058E" # mdi-water-percent
+      - "\U000F0238" # mdi-fire
+      - "\U000F0717" # mdi-snowflake
+      - "\U000F0210" # mdi-fan
+      - "\U000F0079" # mdi-battery
+      - "\U000F0084" # mdi-battery-charging
+      - "\U000F0083" # mdi-battery-alert
+      - "\U000F05A9" # mdi-wifi
+      - "\U000F05AA" # mdi-wifi-off
+      - "\U000F0450" # mdi-refresh
+      - "\U000F04B2" # mdi-sleep
+      - "\U000F07D0" # mdi-home-automation
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_32
+    size: 32
+    glyphs:
+      - "\U000F0599" # mdi-weather-sunny
+      - "\U000F0590" # mdi-weather-cloudy
+      - "\U000F0595" # mdi-weather-partly-cloudy
+      - "\U000F0597" # mdi-weather-rainy
+      - "\U000F0596" # mdi-weather-pouring
+      - "\U000F0593" # mdi-weather-lightning
+      - "\U000F0598" # mdi-weather-snowy
+      - "\U000F059D" # mdi-weather-windy
+      - "\U000F0594" # mdi-weather-night
+      - "\U000F0335" # mdi-lightbulb-on
+      - "\U000F0336" # mdi-lightbulb-outline
+      - "\U000F08DD" # mdi-ceiling-light
+      - "\U000F0425" # mdi-power-plug
+      - "\U000F033E" # mdi-lock
+      - "\U000F033F" # mdi-lock-open
+      - "\U000F06D9" # mdi-garage
+      - "\U000F06DA" # mdi-garage-open
+      - "\U000F050F" # mdi-thermometer
+      - "\U000F058E" # mdi-water-percent
+      - "\U000F0238" # mdi-fire
+      - "\U000F0717" # mdi-snowflake
+      - "\U000F0210" # mdi-fan
+      - "\U000F0079" # mdi-battery
+      - "\U000F0084" # mdi-battery-charging
+      - "\U000F0083" # mdi-battery-alert
+      - "\U000F05A9" # mdi-wifi
+      - "\U000F05AA" # mdi-wifi-off
+      - "\U000F0450" # mdi-refresh
+      - "\U000F04B2" # mdi-sleep
+      - "\U000F07D0" # mdi-home-automation
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_48
+    size: 48
+    glyphs:
+      - "\U000F0599" # mdi-weather-sunny
+      - "\U000F0590" # mdi-weather-cloudy
+      - "\U000F0595" # mdi-weather-partly-cloudy
+      - "\U000F0597" # mdi-weather-rainy
+      - "\U000F0596" # mdi-weather-pouring
+      - "\U000F0593" # mdi-weather-lightning
+      - "\U000F0598" # mdi-weather-snowy
+      - "\U000F059D" # mdi-weather-windy
+      - "\U000F0594" # mdi-weather-night
+      - "\U000F0083" # mdi-battery-alert
+
+# ==============================================================================
+# ED047TC1 4.7" 960x540 16-Grayscale Parallel E-Paper Display
+# ==============================================================================
+display:
+  - platform: lilygo_t5_47_plus
+    id: epaper_display
+    rotation: 0
+    update_interval: never
+    full_update_every: 10
+    lambda: |-
+      epd_ui::render_dashboard(it);

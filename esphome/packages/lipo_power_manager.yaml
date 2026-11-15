@@ -1,0 +1,257 @@
+# ==============================================================================
+# 1S LiPo Battery Sensing & Adaptive Hybrid Power State Machine
+# ==============================================================================
+# The LilyGo T5 4.7" [H716] routes the 2-pin JST 2.0mm PH LiPo battery connector
+# through an internal 100k/100k (2:1) resistor divider to ESP32-S3 GPIO14.
+#
+# Three Selectable Power Profiles:
+#   0 = ALWAYS ONLINE (Modem Sleep) : Instant HA push updates (~18mA avg)
+#   1 = ADAPTIVE HYBRID (Default)   : Modem Sleep during daytime when SoC > 35%;
+#                                     Touch-Armed Deep Sleep during Quiet Hours
+#                                     (23:00-06:00) or when SoC <= 35% (~1.2mA)
+#   2 = MAX BATTERY (Deep Sleep)    : Wakes every 15m via PCF8563/Timer OR
+#                                     instantly on GT911 GPIO16 screen touch!
+# ==============================================================================
+
+wifi:
+  id: wifi_client
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  power_save_mode: LIGHT
+  manual_ip:
+    static_ip: !secret static_ip
+    gateway: !secret gateway_ip
+    subnet: !secret subnet_mask
+    dns1: !secret dns_ip
+
+# ==============================================================================
+# ESP32-S3 Deep Sleep Controller with GT911 Touch Interrupt Wakeup (GPIO16)
+# ==============================================================================
+deep_sleep:
+  id: deep_sleep_ctrl
+  sleep_duration: 15min
+  wakeup_pin:
+    number: GPIO16
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+
+# ==============================================================================
+# RTC-Backed Globals (Persisted across Deep Sleep Wake Cycles)
+# ==============================================================================
+globals:
+  # Current active tab (0=Controls, 1=Weather, 2=Climate, 3=LiPo & Diagnostics)
+  - id: active_tab
+    type: int
+    restore_value: true
+    initial_value: '0'
+
+  # Cumulative partial refresh counter (triggers full ghost-clear every 10 updates)
+  - id: refresh_counter
+    type: int
+    restore_value: true
+    initial_value: '0'
+
+  # Active power profile: 0 = Always Online, 1 = Adaptive Hybrid, 2 = Max Battery
+  - id: power_mode_index
+    type: int
+    restore_value: true
+    initial_value: '1'
+
+  # Epoch timestamp of most recent GT911 touch event
+  - id: last_touch_epoch
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # Millis timestamp of most recent GT911 touch event
+  - id: last_touch_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # Previous ADC sample voltage for positive dV/dt charging detection
+  - id: prev_lipo_voltage
+    type: float
+    restore_value: true
+    initial_value: '3.95'
+
+# ==============================================================================
+# 1S LiPo Voltage ADC (GPIO14) & 11-Point Non-Linear Discharge Curve Lookup
+# ==============================================================================
+sensor:
+  - platform: adc
+    pin: GPIO14
+    id: lipo_voltage
+    name: "LiPo Battery Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    attenuation: 12db
+    update_interval: 30s
+    filters:
+      - multiply: 2.0
+      - sliding_window_moving_average:
+          window_size: 8
+          send_every: 2
+          send_first_at: 1
+    on_value:
+      then:
+        - component.update: lipo_battery_level
+        - script.execute: evaluate_power_state
+
+  - platform: template
+    id: lipo_battery_level
+    name: "LiPo Battery Level"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      float v = id(lipo_voltage).state;
+      if (isnan(v) || v <= 0.1f) return 0.0f;
+
+      // 11-Point Piecewise Linear 1S LiPo Discharge Curve (3.30V = 0% .. 4.20V = 100%)
+      struct CurvePoint { float volt; float pct; };
+      static const CurvePoint kCurve[11] = {
+        {4.20f, 100.0f},
+        {4.06f,  90.0f},
+        {3.98f,  80.0f},
+        {3.92f,  70.0f},
+        {3.87f,  60.0f},
+        {3.82f,  50.0f},
+        {3.79f,  40.0f},
+        {3.75f,  30.0f},
+        {3.70f,  20.0f},
+        {3.61f,  10.0f},
+        {3.30f,   0.0f}
+      };
+
+      if (v >= kCurve[0].volt) return 100.0f;
+      if (v <= kCurve[10].volt) return 0.0f;
+
+      for (int i = 0; i < 10; i++) {
+        if (v <= kCurve[i].volt && v >= kCurve[i + 1].volt) {
+          float span_v = kCurve[i].volt - kCurve[i + 1].volt;
+          float ratio = (v - kCurve[i + 1].volt) / span_v;
+          return kCurve[i + 1].pct + ratio * (kCurve[i].pct - kCurve[i + 1].pct);
+        }
+      }
+      return 0.0f;
+
+# ==============================================================================
+# LiPo USB-C Charging Heuristic Binary Sensor
+# ==============================================================================
+binary_sensor:
+  - platform: template
+    id: lipo_charging
+    name: "LiPo Battery Charging"
+    device_class: battery_charging
+    lambda: |-
+      float v = id(lipo_voltage).state;
+      if (isnan(v)) return false;
+      float dv = v - id(prev_lipo_voltage);
+      bool charging = (v > 4.22f) || (dv >= 0.015f);
+      id(prev_lipo_voltage) = v;
+      return charging;
+
+# ==============================================================================
+# Power Management & E-Paper Refresh Scripts
+# ==============================================================================
+script:
+  - id: request_screen_refresh
+    mode: restart
+    then:
+      - lambda: |-
+          id(refresh_counter) += 1;
+      - component.update: epaper_display
+
+  - id: trigger_full_clean_refresh
+    mode: single
+    then:
+      - logger.log: "Triggering full black-white-clear anti-ghosting E-Paper cycle"
+      - lambda: |-
+          id(refresh_counter) = 0;
+      - component.update: epaper_display
+
+  - id: enter_touch_armed_deep_sleep
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return id(ha_stay_awake_ota).state;'
+          then:
+            - logger.log: "Stay-Awake OTA lock is ON in Home Assistant — skipping Deep Sleep"
+          else:
+            - logger.log: "Rendering sleep status badge and entering Touch-Armed Deep Sleep (GPIO16 EXT0)"
+            - component.update: epaper_display
+            - delay: 600ms
+            - deep_sleep.enter:
+                id: deep_sleep_ctrl
+                sleep_duration: 15min
+
+  - id: evaluate_power_state
+    mode: single
+    then:
+      - lambda: |-
+          float vbat = id(lipo_voltage).state;
+          float soc  = id(lipo_battery_level).state;
+          float v_crit = atof("${vbat_critical}");
+          float soc_thresh = atof("${hybrid_sleep_soc_threshold}");
+          uint32_t idle_limit_ms = (uint32_t)(atoi("${inactivity_timeout_sec}")) * 1000UL;
+
+          // 1. Critical Low-Battery Hardware Protection (< 3.32V)
+          // Renders the Critical Hibernate lock screen and sleeps indefinitely
+          if (!isnan(vbat) && vbat > 2.0f && vbat < v_crit && !id(lipo_charging).state) {
+            ESP_LOGE("power", "CRITICAL LIPO VOLTAGE (%.2fV < %.2fV) — Hibernating to protect cell!", vbat, v_crit);
+            id(epaper_display).update();
+            id(deep_sleep_ctrl).set_sleep_duration(86400000UL); // 24h emergency cut-off
+            id(deep_sleep_ctrl).begin_sleep(true);
+            return;
+          }
+
+          // 2. Respect Home Assistant OTA Stay-Awake Lock
+          if (id(ha_stay_awake_ota).state) {
+            id(deep_sleep_ctrl).prevent_deep_sleep();
+            return;
+          }
+
+          // 3. Respect User Touch Activity Window (stay awake for 90s after any tap)
+          uint32_t elapsed_ms = millis() - id(last_touch_ms);
+          if (elapsed_ms < idle_limit_ms) {
+            return;
+          }
+
+          // 4. Mode 0: Always Online (Wi-Fi Modem Sleep) — Never enter Deep Sleep
+          if (id(power_mode_index) == 0) {
+            return;
+          }
+
+          // 5. Mode 2: Max Battery — Enter Touch-Armed Deep Sleep as soon as idle
+          if (id(power_mode_index) == 2) {
+            id(enter_touch_armed_deep_sleep).execute();
+            return;
+          }
+
+          // 6. Mode 1: Adaptive Hybrid — Check Quiet Hours (23:00..06:00) & SoC Threshold
+          bool in_quiet_hours = false;
+          auto now = id(rtc_time).now();
+          if (now.is_valid()) {
+            int hr = now.hour;
+            int q_start = atoi("${quiet_start_hour}");
+            int q_end   = atoi("${quiet_end_hour}");
+            if (q_start > q_end) {
+              in_quiet_hours = (hr >= q_start || hr < q_end);
+            } else {
+              in_quiet_hours = (hr >= q_start && hr < q_end);
+            }
+          }
+
+          bool low_soc = (!isnan(soc) && soc <= soc_thresh && !id(lipo_charging).state);
+          if (in_quiet_hours || low_soc) {
+            id(enter_touch_armed_deep_sleep).execute();
+          }

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LilyGo T5 4.7" E-Paper Touch [H716] — ESPHome &amp; Home Assistant Simulator</title>
+  <link rel="stylesheet" href="simulator.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Workbench Bar -->
+    <header class="workbench-header">
+      <div class="brand-group">
+        <div class="hardware-badge">H716 • ESP32-S3-N16R8</div>
+        <div>
+          <h1>LilyGo T5 4.7&quot; E-Paper Touch Simulator</h1>
+          <p class="subtitle">ED047TC1 960&times;540 16-Level Grayscale &bull; GT911 Capacitive Touch &bull; 1S LiPo Power State Machine</p>
+        </div>
+      </div>
+      <div class="telemetry-strip">
+        <div class="telemetry-pill">
+          <span class="label">CURSOR</span>
+          <span id="cursor-coords" class="mono-val">X: ---, Y: ---</span>
+        </div>
+        <div class="telemetry-pill">
+          <span class="label">HITBOX</span>
+          <span id="hovered-hitbox" class="mono-val">none</span>
+        </div>
+        <div class="telemetry-pill">
+          <span class="label">POWER STATE</span>
+          <span id="header-power-state" class="mono-val state-online">ONLINE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Studio Grid -->
+    <main class="studio-grid">
+      <!-- Left: Physical LilyGo T5 4.7" [H716] Hardware Bezel -->
+      <section class="device-stage" aria-label="LilyGo T5 4.7 inch E-Paper Device Bezel">
+        <div class="bezel-frame">
+          <!-- Side Hardware Buttons & Ports (decorative + interactive) -->
+          <div class="bezel-top-edge">
+            <span class="pcb-silkscreen">LILYGO T5-4.7-S3 Plus [H716]</span>
+            <div class="bezel-indicators">
+              <span class="led-group">
+                <span id="led-charge" class="hw-led" title="USB-C LiPo Charge LED"></span>
+                <span class="led-label">CHG</span>
+              </span>
+              <span class="led-group">
+                <span id="led-active" class="hw-led active" title="ESP32-S3 Active / Deep Sleep LED"></span>
+                <span class="led-label">PWR</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="epd-screen-well">
+            <div class="canvas-stack" id="canvas-stack">
+              <canvas id="epd-canvas" width="960" height="540" aria-label="960x540 E-Paper Display"></canvas>
+              <canvas id="overlay-canvas" width="960" height="540" aria-hidden="true"></canvas>
+              <div id="sleep-banner" class="sleep-banner hidden" role="status">
+                <span class="sleep-dot"></span>
+                <span>TOUCH-ARMED DEEP SLEEP (0.2 mA) &mdash; Click anywhere on the screen to fire <strong>GPIO16 EXT0</strong> wake interrupt</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bezel-bottom-edge">
+            <div class="hw-port">
+              <span class="usbc-slot" id="usbc-slot"></span>
+              <span class="port-label">USB-C (JTAG / UART / 5V Charge)</span>
+            </div>
+            <div class="hw-buttons">
+              <button type="button" id="btn-hw-boot" class="hw-tact-btn" title="GPIO0 BOOT Button (Download Mode)">BOOT</button>
+              <button type="button" id="btn-hw-rst" class="hw-tact-btn" title="Reset ESP32-S3 (Cold Boot)">RST</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage-legend">
+          <span>Tip: Click any card, tab, thermostat <code>[-]</code>/<code>[+]</code>, or header button directly on the 960&times;540 display.</span>
+          <span>Shift+Click <code>[MODE]</code> or use the Deep Sleep button to test <code>GPIO16</code> wake.</span>
+        </div>
+      </section>
+
+      <!-- Right: Hardware Control Panel & Live API Console -->
+      <aside class="control-sidebar" aria-label="Simulator Hardware Controls">
+        <!-- 1S LiPo Battery Simulator -->
+        <section class="panel-card">
+          <div class="panel-header">
+            <h2>1S LiPo Battery &amp; ADC (GPIO14)</h2>
+            <span id="lipo-badge" class="badge badge-ok">84% &bull; 4.01V</span>
+          </div>
+
+          <div class="slider-row">
+            <input type="range" id="lipo-voltage-slider" min="3.20" max="4.25" step="0.01" value="4.01" aria-label="1S LiPo Battery Voltage">
+            <div class="slider-scale">
+              <span>3.20V (Cutoff)</span>
+              <span>3.32V (Hibernate)</span>
+              <span>3.70V (20%)</span>
+              <span>4.20V (100%)</span>
+            </div>
+          </div>
+
+          <div class="preset-row">
+            <button type="button" class="preset-btn" data-voltage="4.20">4.20V Full</button>
+            <button type="button" class="preset-btn" data-voltage="3.82">3.82V 50%</button>
+            <button type="button" class="preset-btn" data-voltage="3.72">3.72V Low</button>
+            <button type="button" class="preset-btn" data-voltage="3.45">3.45V Warn</button>
+            <button type="button" class="preset-btn danger" data-voltage="3.28">3.28V Critical</button>
+          </div>
+
+          <div class="toggle-grid">
+            <label class="switch-row">
+              <span>
+                <strong>USB-C Charging Plugged In</strong>
+                <small>Simulates 5V VBUS &amp; charging bolt</small>
+              </span>
+              <input type="checkbox" id="toggle-charging">
+              <span class="switch-ui"></span>
+            </label>
+
+            <label class="switch-row">
+              <span>
+                <strong>Stay Awake for OTA</strong>
+                <small><code>input_boolean.lilygo_t5_stay_awake_ota</code></small>
+              </span>
+              <input type="checkbox" id="toggle-ota-awake">
+              <span class="switch-ui"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Display, Units & GT911 Overlay Controls -->
+        <section class="panel-card">
+          <div class="panel-header">
+            <h2>Display, Units &amp; GT911 Debug</h2>
+            <span id="refresh-counter-badge" class="badge">Partial: 0 / 10</span>
+          </div>
+
+          <div class="toggle-grid">
+            <label class="switch-row">
+              <span>
+                <strong>Units: <span id="units-label">Imperial (&deg;F, mph, 12h)</span></strong>
+                <small>Toggle Imperial vs Metric (&deg;C, km/h, 24h)</small>
+              </span>
+              <input type="checkbox" id="toggle-metric">
+              <span class="switch-ui"></span>
+            </label>
+
+            <label class="switch-row">
+              <span>
+                <strong>Show GT911 Hitboxes &amp; Coordinates</strong>
+                <small>Dashed touch bounds + live (X, Y) inspector</small>
+              </span>
+              <input type="checkbox" id="toggle-hitboxes">
+              <span class="switch-ui"></span>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <button type="button" id="btn-deep-sleep" class="action-btn primary">
+              Simulate Deep Sleep &amp; Touch Wake (GPIO16 EXT0)
+            </button>
+            <button type="button" id="btn-rtc-wake" class="action-btn">
+              PCF8563 15m Timer Wake
+            </button>
+            <button type="button" id="btn-cycle-weather" class="action-btn">
+              Cycle Weather
+            </button>
+          </div>
+        </section>
+
+        <!-- Live ESPHome <-> Home Assistant API Event Console -->
+        <section class="panel-card console-card">
+          <div class="panel-header">
+            <h2>ESPHome &harr; Home Assistant API Console</h2>
+            <button type="button" id="btn-clear-log" class="mini-btn">Clear</button>
+          </div>
+          <div id="api-console" class="api-console" role="log" aria-live="polite"></div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="simulator.js"></script>
+</body>
+</html>

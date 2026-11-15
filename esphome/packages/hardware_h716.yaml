@@ -1,0 +1,123 @@
+# ==============================================================================
+# Hardware Package: LilyGo T5 4.7-inch E-Paper Touch Non-Soldered Female Pin [H716]
+# ==============================================================================
+# Board Specifications:
+# - MCU           : ESP32-S3-WROOM-1-N16R8 (Dual-Core LX7 @ 240MHz)
+# - Flash / PSRAM : 16MB Quad SPI Flash + 8MB Octal PSRAM (80MHz)
+# - E-Paper Panel : ED047TC1 4.7" 960x540 16-Level Grayscale (8-bit Parallel Bus)
+# - Shared I2C    : SDA = GPIO17, SCL = GPIO18 (400kHz Fast Mode)
+# - Touch Sensor  : Goodix GT911 Capacitive Touch (I2C 0x5D / 0x14, INT = GPIO16)
+# - RealTimeClock : NXP PCF8563 RTC (I2C 0x51, INT = GPIO21)
+# - Battery Sense : GPIO14 ADC1_CH3 (Internal 100k/100k 2:1 Voltage Divider)
+# ==============================================================================
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: arduino
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# ==============================================================================
+# External Display Component for ESP32-S3 + ED047TC1 Parallel E-Paper
+# Primary community driver: github://hbast/lilygo_t5_47_plus
+# Fallback alternative   : github://nickolay/esphome-lilygo-t547plus@main
+# ==============================================================================
+external_components:
+  - source:
+      type: git
+      url: https://github.com/hbast/lilygo_t5_47_plus
+      ref: main
+    components: [lilygo_t5_47_plus]
+
+  # Fallback option (uncomment below and comment out above if needed):
+  # - source: github://nickolay/esphome-lilygo-t547plus@main
+  #   components: [t547]
+
+# ==============================================================================
+# Shared Onboard + 40-Pin Female Header I2C Bus (GPIO17 SDA / GPIO18 SCL)
+# Connects GT911 Touch, PCF8563 RTC, and optional external female-header sensors
+# ==============================================================================
+i2c:
+  - id: i2c_bus
+    sda: GPIO17
+    scl: GPIO18
+    frequency: 400kHz
+    scan: true
+
+# ==============================================================================
+# Dual Time Sources: Onboard PCF8563 Hardware RTC + Home Assistant Network Sync
+# Provides instant wall-clock time on Deep Sleep wake before Wi-Fi connects!
+# ==============================================================================
+time:
+  - platform: pcf8563
+    id: rtc_time
+    i2c_id: i2c_bus
+    address: 0x51
+    update_interval: 15min
+
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        - pcf8563.write_time:
+            id: rtc_time
+        - logger.log: "Synchronized Home Assistant network time to onboard PCF8563 RTC"
+    on_time:
+      # Evaluate power state and refresh clock every minute while awake
+      - seconds: 0
+        minutes: /1
+        then:
+          - script.execute: request_screen_refresh
+          - script.execute: evaluate_power_state
+
+# ==============================================================================
+# Goodix GT911 Capacitive Touchscreen Controller
+# Interrupt pin GPIO16 also acts as the EXT0 Deep Sleep Wakeup Pin!
+# ==============================================================================
+touchscreen:
+  - platform: gt911
+    id: gt911_touch
+    i2c_id: i2c_bus
+    interrupt_pin: GPIO16
+    display: epaper_display
+    on_touch:
+      then:
+        - lambda: |-
+            id(last_touch_ms) = millis();
+            if (id(rtc_time).now().is_valid()) {
+              id(last_touch_epoch) = id(rtc_time).now().timestamp;
+            }
+        - logger.log:
+            format: "GT911 Touch detected at X=%d, Y=%d — resetting inactivity timer"
+            args: ['touch.x', 'touch.y']
+
+# ==============================================================================
+# OPTIONAL: Local Room Sensor on the H716 40-Pin Non-Soldered Female Header
+# Wire 3.3V, GND, SDA (GPIO17), and SCL (GPIO18) on the female header to a
+# BME280 or SHT4x breakout board and uncomment the block below.
+# ==============================================================================
+# sensor:
+#   - platform: bme280_i2c
+#     i2c_id: i2c_bus
+#     address: 0x76
+#     update_interval: 60s
+#     temperature:
+#       name: "H716 Local Bezel Temperature"
+#     humidity:
+#       name: "H716 Local Bezel Humidity"
+#     pressure:
+#       name: "H716 Local Bezel Pressure"
+#
+#   - platform: sht4x
+#     i2c_id: i2c_bus
+#     address: 0x44
+#     update_interval: 60s
+#     temperature:
+#       name: "H716 SHT4x Temperature"
+#     humidity:
+#       name: "H716 SHT4x Humidity"
