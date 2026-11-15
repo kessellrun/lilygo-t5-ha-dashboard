@@ -95,7 +95,7 @@ binary_sensor:
 
   - platform: touchscreen
     id: touch_hdr_sleep
-    name: "Header Power Mode / Sleep Button"
+    name: "Header Power Mode and Sleep Button"
     touchscreen_id: gt911_touch
     x_min: 846
     x_max: 955

@@ -12,7 +12,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_1
     entity_id: ${entity_ctrl_1}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -24,7 +24,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_2
     entity_id: ${entity_ctrl_2}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -36,7 +36,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_3
     entity_id: ${entity_ctrl_3}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -48,7 +48,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_4
     entity_id: ${entity_ctrl_4}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -60,7 +60,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_5
     entity_id: ${entity_ctrl_5}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -72,7 +72,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ctrl_6
     entity_id: ${entity_ctrl_6}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:
@@ -85,7 +85,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_stay_awake_ota
     entity_id: ${entity_stay_awake_ota}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       then:
         - if:

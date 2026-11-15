@@ -26,13 +26,13 @@ wifi:
     dns1: !secret dns_ip
 
 # ==============================================================================
-# ESP32-S3 Deep Sleep Controller with GT911 Touch Interrupt Wakeup (GPIO16)
+# ESP32-S3 Deep Sleep Controller with Onboard Wake Button (GPIO21 / RTC_GPIO21)
 # ==============================================================================
 deep_sleep:
   id: deep_sleep_ctrl
   sleep_duration: 15min
   wakeup_pin:
-    number: GPIO16
+    number: GPIO21
     inverted: true
     mode:
       input: true

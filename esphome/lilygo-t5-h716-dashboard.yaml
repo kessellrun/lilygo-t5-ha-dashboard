@@ -4,8 +4,9 @@
 # Hardware SKU : LilyGo T5 4.7-inch E-Paper Non-Soldered Female Pin [H716]
 # SoC / Memory : ESP32-S3-WROOM-1-N16R8 (16MB Quad Flash, 8MB Octal PSRAM)
 # Display      : ED047TC1 4.7" E-Ink (960 x 540 pixels, 16-level Grayscale)
-# Touch Panel  : GT911 Capacitive Touch (I2C SDA=GPIO17, SCL=GPIO18, INT=GPIO16)
-# Onboard RTC  : PCF8563 Real-Time Clock (I2C 0x51, SDA=GPIO17, SCL=GPIO18)
+# Touch Panel  : GT911 Capacitive Touch (I2C SDA=GPIO18, SCL=GPIO17, INT=GPIO47)
+# Onboard RTC  : PCF8563 Real-Time Clock (I2C 0x51, SDA=GPIO18, SCL=GPIO17)
+# Wake Button  : GPIO21 (RTC_GPIO21 physical side button for Deep Sleep wake)
 # Battery ADC  : GPIO14 (Internal 2:1 Voltage Divider -> 1S 3.7V LiPo Connector)
 # ==============================================================================
 
@@ -119,7 +120,7 @@ esphome:
           // Determine ESP32-S3 wakeup cause for diagnostics & power management
           auto cause = esp_sleep_get_wakeup_cause();
           if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
-            id(wake_reason_text).publish_state("GPIO16 Touch Interrupt");
+            id(wake_reason_text).publish_state("GPIO21 Wake Button");
           } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
             id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
           } else {
@@ -144,6 +145,7 @@ packages:
 logger:
   level: INFO
   baud_rate: 115200
+  hardware_uart: USB_SERIAL_JTAG
 
 api:
   id: ha_api
@@ -294,6 +296,5 @@ display:
     id: epaper_display
     rotation: 0
     update_interval: never
-    full_update_every: 10
     lambda: |-
       epd_ui::render_dashboard(it);

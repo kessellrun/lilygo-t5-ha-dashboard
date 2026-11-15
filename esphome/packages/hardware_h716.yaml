@@ -5,9 +5,10 @@
 # - MCU           : ESP32-S3-WROOM-1-N16R8 (Dual-Core LX7 @ 240MHz)
 # - Flash / PSRAM : 16MB Quad SPI Flash + 8MB Octal PSRAM (80MHz)
 # - E-Paper Panel : ED047TC1 4.7" 960x540 16-Level Grayscale (8-bit Parallel Bus)
-# - Shared I2C    : SDA = GPIO17, SCL = GPIO18 (400kHz Fast Mode)
-# - Touch Sensor  : Goodix GT911 Capacitive Touch (I2C 0x5D / 0x14, INT = GPIO16)
-# - RealTimeClock : NXP PCF8563 RTC (I2C 0x51, INT = GPIO21)
+# - Shared I2C    : SDA = GPIO18, SCL = GPIO17 (400kHz Fast Mode)
+# - Touch Sensor  : Goodix GT911 Capacitive Touch (I2C 0x5D / 0x14, INT = GPIO47)
+# - RealTimeClock : NXP PCF8563 RTC (I2C 0x51)
+# - Wake Button   : GPIO21 (RTC_GPIO21 physical side button for Deep Sleep wake)
 # - Battery Sense : GPIO14 ADC1_CH3 (Internal 100k/100k 2:1 Voltage Divider)
 # ==============================================================================
 
@@ -39,13 +40,13 @@ external_components:
   #   components: [t547]
 
 # ==============================================================================
-# Shared Onboard + 40-Pin Female Header I2C Bus (GPIO17 SDA / GPIO18 SCL)
+# Shared Onboard + 40-Pin Female Header I2C Bus (GPIO18 SDA / GPIO17 SCL)
 # Connects GT911 Touch, PCF8563 RTC, and optional external female-header sensors
 # ==============================================================================
 i2c:
   - id: i2c_bus
-    sda: GPIO17
-    scl: GPIO18
+    sda: GPIO18
+    scl: GPIO17
     frequency: 400kHz
     scan: true
 
@@ -76,14 +77,13 @@ time:
           - script.execute: evaluate_power_state
 
 # ==============================================================================
-# Goodix GT911 Capacitive Touchscreen Controller
-# Interrupt pin GPIO16 also acts as the EXT0 Deep Sleep Wakeup Pin!
+# Goodix GT911 Capacitive Touchscreen Controller (INT = GPIO47 on ESP32-S3 H716)
 # ==============================================================================
 touchscreen:
   - platform: gt911
     id: gt911_touch
     i2c_id: i2c_bus
-    interrupt_pin: GPIO16
+    interrupt_pin: GPIO47
     display: epaper_display
     on_touch:
       then:
