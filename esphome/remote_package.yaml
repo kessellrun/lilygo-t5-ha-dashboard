@@ -305,14 +305,14 @@ display:
       float vbat = id(lipo_voltage).state;
       if (!isnan(vbat) && vbat > 2.0f && vbat < 3.32f && !id(lipo_charging).state) {
         draw_card(60, 50, 840, 440, false, 4);
-        it.print(480, 125, &id(font_mdi_48), COLOR_ON, TextAlign::TOP_CENTER, "\U000F0083");
-        it.print(480, 195, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "CRITICAL LIPO BATTERY");
-        it.printf(480, 250, &id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER,
+        it.print(480, 125, id(font_mdi_48), COLOR_ON, TextAlign::TOP_CENTER, "\U000F0083");
+        it.print(480, 195, id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "CRITICAL LIPO BATTERY");
+        it.printf(480, 250, id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER,
                   "Pack Voltage: %.2f V  (Cutoff Threshold: 3.32 V)", vbat);
         it.line(120, 300, 840, 300, COLOR_ON);
-        it.print(480, 325, &id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER,
+        it.print(480, 325, id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER,
                  "Entering hardware over-discharge protection mode (Deep Hibernate).");
-        it.print(480, 358, &id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER,
+        it.print(480, 358, id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER,
                  "Connect a 5V USB-C cable to charge the 1S LiPo battery and resume.");
         return;
       }
@@ -329,44 +329,44 @@ display:
         const char *ampm = (now.hour >= 12) ? "PM" : "AM";
         char time_buf[32];
         snprintf(time_buf, sizeof(time_buf), "%d:%02d %s", hr12, now.minute, ampm);
-        it.print(16, 8, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, time_buf);
+        it.print(16, 8, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, time_buf);
 
         char date_buf[32];
         now.strftime(date_buf, sizeof(date_buf), "%a, %b %d");
-        it.print(16, 35, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, date_buf);
+        it.print(16, 35, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, date_buf);
       } else {
-        it.print(16, 10, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "12:00 PM");
-        it.print(16, 35, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Syncing RTC...");
+        it.print(16, 10, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "12:00 PM");
+        it.print(16, 35, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Syncing RTC...");
       }
 
       float rssi = id(wifi_rssi).state;
       const char *wifi_icon = (!isnan(rssi) && rssi > -95.0f) ? "\U000F05A9" : "\U000F05AA";
-      it.print(318, 16, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, wifi_icon);
+      it.print(318, 16, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, wifi_icon);
 
       const char *mode_label = "ADAPTIVE HYBRID";
       if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
       else if (id(power_mode_index) == 2) mode_label = "MAX BATTERY";
 
       draw_card(350, 12, 195, 32, false, 1);
-      it.print(447, 19, &id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, mode_label);
+      it.print(447, 19, id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, mode_label);
 
       float soc = id(lipo_battery_level).state;
       bool chg  = id(lipo_charging).state;
       if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
 
       const char *bat_icon = chg ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
-      it.print(560, 15, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
-      it.printf(588, 11, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
-      it.printf(588, 33, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
+      it.print(560, 15, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
+      it.printf(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
+      it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
                 chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA STAY-AWAKE" : "1S LIPO ACTIVE"));
 
       draw_card(740, 8, 105, 40, false, 2);
-      it.print(752, 17, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
-      it.print(780, 20, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "CLEAN");
+      it.print(752, 17, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
+      it.print(780, 20, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "CLEAN");
 
       draw_card(846, 8, 104, 40, false, 2);
-      it.print(856, 17, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F04B2");
-      it.print(884, 20, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MODE");
+      it.print(856, 17, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F04B2");
+      it.print(884, 20, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MODE");
 
       // 3. Main Tab Body (y: 57..475)
       int cur_tab = id(active_tab);
@@ -394,17 +394,17 @@ display:
           auto fg = is_on ? COLOR_OFF : COLOR_ON;
           const char *ico = is_on ? cards[i].icon_on : cards[i].icon_off;
           const char *st_txt = is_on ? cards[i].state_on_label : cards[i].state_off_label;
-          it.print(cards[i].x + 22, cards[i].y + 22, &id(font_mdi_32), fg, TextAlign::TOP_LEFT, ico);
-          it.print(cards[i].x + 268, cards[i].y + 26, &id(font_bold_18), fg, TextAlign::TOP_RIGHT, st_txt);
-          it.print(cards[i].x + 22, cards[i].y + 92, &id(font_bold_24), fg, TextAlign::TOP_LEFT, cards[i].title);
-          it.print(cards[i].x + 22, cards[i].y + 128, &id(font_regular_14), fg, TextAlign::TOP_LEFT, cards[i].subtitle);
+          it.print(cards[i].x + 22, cards[i].y + 22, id(font_mdi_32), fg, TextAlign::TOP_LEFT, ico);
+          it.print(cards[i].x + 268, cards[i].y + 26, id(font_bold_18), fg, TextAlign::TOP_RIGHT, st_txt);
+          it.print(cards[i].x + 22, cards[i].y + 92, id(font_bold_24), fg, TextAlign::TOP_LEFT, cards[i].title);
+          it.print(cards[i].x + 22, cards[i].y + 128, id(font_regular_14), fg, TextAlign::TOP_LEFT, cards[i].subtitle);
         }
         if (id(last_touch_x) >= 0 && id(last_touch_y) >= 0) {
-          it.printf(24, 448, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
+          it.printf(24, 448, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
                     "GT911 Touch Ready (Last Tap: X=%d, Y=%d)  •  %d of 6 Active  •  Tap any card to toggle",
                     id(last_touch_x), id(last_touch_y), active_count);
         } else {
-          it.printf(24, 448, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
+          it.printf(24, 448, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
                     "GT911 Capacitive Touch Ready  •  %d of 6 Entities Active  •  Tap any card to toggle",
                     active_count);
         }
@@ -424,25 +424,25 @@ display:
         if (isnan(uv))    uv    = 5.0f;
         if (isnan(press)) press = 1016.0f;
 
-        it.print(44, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "OUTDOOR CONDITIONS");
-        it.print(52, 130, &id(font_mdi_48), COLOR_ON, TextAlign::TOP_LEFT, weather_to_mdi(cond));
-        it.printf(132, 125, &id(font_bold_48), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", temp);
-        it.printf(134, 182, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%s", format_cond_label(cond).c_str());
+        it.print(44, 92, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "OUTDOOR CONDITIONS");
+        it.print(52, 130, id(font_mdi_48), COLOR_ON, TextAlign::TOP_LEFT, weather_to_mdi(cond));
+        it.printf(132, 125, id(font_bold_48), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", temp);
+        it.printf(134, 182, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%s", format_cond_label(cond).c_str());
         it.line(44, 224, 396, 224, COLOR_ON);
 
-        it.print(44, 242, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "FEELS LIKE");
-        it.printf(44, 264, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", feels);
-        it.print(230, 242, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "HUMIDITY");
-        it.printf(230, 264, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%%", hum);
-        it.print(44, 315, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "WIND SPEED");
-        it.printf(44, 337, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.1f mph", wind);
-        it.print(230, 315, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "UV INDEX");
-        it.printf(230, 337, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f", uv);
-        it.print(44, 388, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "BAROMETRIC PRESSURE");
-        it.printf(44, 410, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f hPa", press);
+        it.print(44, 242, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "FEELS LIKE");
+        it.printf(44, 264, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", feels);
+        it.print(230, 242, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "HUMIDITY");
+        it.printf(230, 264, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%%", hum);
+        it.print(44, 315, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "WIND SPEED");
+        it.printf(44, 337, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.1f mph", wind);
+        it.print(230, 315, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "UV INDEX");
+        it.printf(230, 337, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f", uv);
+        it.print(44, 388, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "BAROMETRIC PRESSURE");
+        it.printf(44, 410, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f hPa", press);
 
         draw_card(440, 75, 500, 380, false, 2);
-        it.print(464, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "5-DAY OUTLOOK (COMPACT HA STREAM)");
+        it.print(464, 92, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "5-DAY OUTLOOK (COMPACT HA STREAM)");
         struct ForecastDay { std::string day; std::string cond; int hi; int lo; };
         ForecastDay days[5] = {
           {"MON", "sunny", 75, 58}, {"TUE", "partlycloudy", 73, 56},
@@ -473,12 +473,12 @@ display:
           int col_x = 452 + i * 96;
           int cx = col_x + 44;
           if (i > 0) it.line(col_x, 125, col_x, 435, COLOR_ON);
-          it.print(cx, 130, &id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER, days[i].day.c_str());
-          it.print(cx, 175, &id(font_mdi_32), COLOR_ON, TextAlign::TOP_CENTER, weather_to_mdi(days[i].cond));
-          it.printf(cx, 232, &id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].hi);
+          it.print(cx, 130, id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER, days[i].day.c_str());
+          it.print(cx, 175, id(font_mdi_32), COLOR_ON, TextAlign::TOP_CENTER, weather_to_mdi(days[i].cond));
+          it.printf(cx, 232, id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].hi);
           it.rectangle(cx - 6, 272, 12, 96, COLOR_ON);
           it.filled_rectangle(cx - 4, 286, 8, 64, COLOR_ON);
-          it.printf(cx, 382, &id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].lo);
+          it.printf(cx, 382, id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].lo);
         }
       } else if (cur_tab == 2) {
         struct RoomCard { int x; int y; const char *name; float temp; float hum; bool is_espresso; };
@@ -494,21 +494,21 @@ display:
           float rt = isnan(rooms[i].temp) ? fallback_t[i] : rooms[i].temp;
           float rh = isnan(rooms[i].hum)  ? fallback_h[i] : rooms[i].hum;
           draw_card(rooms[i].x, rooms[i].y, 270, 185, false, 2);
-          it.print(rooms[i].x + 18, rooms[i].y + 16, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, rooms[i].name);
-          it.printf(rooms[i].x + 18, rooms[i].y + 54, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.1f°", rt);
+          it.print(rooms[i].x + 18, rooms[i].y + 16, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, rooms[i].name);
+          it.printf(rooms[i].x + 18, rooms[i].y + 54, id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.1f°", rt);
           if (rooms[i].is_espresso) {
-            it.print(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Decent DE1Pro Head");
+            it.print(rooms[i].x + 18, rooms[i].y + 114, id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Decent DE1Pro Head");
             const char *brew_state = (!isnan(rooms[i].temp) && rooms[i].temp > 175.0f) ? "BREW TEMP READY" : "STANDBY / WARMING";
-            it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, brew_state);
+            it.print(rooms[i].x + 18, rooms[i].y + 148, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, brew_state);
           } else {
-            it.printf(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Humidity: %.0f%%", rh);
+            it.printf(rooms[i].x + 18, rooms[i].y + 114, id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Humidity: %.0f%%", rh);
             const char *comfort = (rt >= 67.0f && rt <= 74.0f && rh >= 35.0f && rh <= 55.0f) ? "OPTIMAL COMFORT" : "CHECK ZONE";
-            it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, comfort);
+            it.print(rooms[i].x + 18, rooms[i].y + 148, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, comfort);
           }
         }
 
         draw_card(600, 75, 340, 380, false, 2);
-        it.print(622, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MAIN HVAC THERMOSTAT");
+        it.print(622, 92, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MAIN HVAC THERMOSTAT");
         std::string hvac_mode   = id(ha_hvac_mode).state;
         std::string hvac_action = id(ha_hvac_action).state;
         if (hvac_mode.empty() || hvac_mode == "unknown") hvac_mode = "cool";
@@ -518,26 +518,26 @@ display:
         if (isnan(cur_t)) cur_t = 71.0f;
         if (isnan(tgt_t)) tgt_t = 70.0f;
 
-        it.printf(622, 122, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "Mode: %s (%s)", hvac_mode.c_str(), hvac_action.c_str());
-        it.print(622, 165, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "CURRENT");
-        it.printf(622, 188, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", cur_t);
-        it.print(790, 165, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "TARGET SETPOINT");
-        it.printf(790, 188, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", tgt_t);
+        it.printf(622, 122, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "Mode: %s (%s)", hvac_mode.c_str(), hvac_action.c_str());
+        it.print(622, 165, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "CURRENT");
+        it.printf(622, 188, id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", cur_t);
+        it.print(790, 165, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "TARGET SETPOINT");
+        it.printf(790, 188, id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", tgt_t);
 
         draw_card(625, 295, 85, 60, false, 2);
-        it.print(667, 307, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "-");
-        it.print(770, 315, &id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, "ADJUST");
+        it.print(667, 307, id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "-");
+        it.print(770, 315, id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, "ADJUST");
         draw_card(830, 295, 85, 60, false, 2);
-        it.print(872, 307, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "+");
+        it.print(872, 307, id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "+");
 
         it.line(622, 372, 918, 372, COLOR_ON);
         float co2 = id(ha_indoor_co2).state;
         float aqi = id(ha_indoor_aqi).state;
         if (isnan(co2)) co2 = 540.0f;
         if (isnan(aqi)) aqi = 18.0f;
-        it.printf(622, 386, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "CO2: %.0f ppm", co2);
-        it.printf(810, 386, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "AQI: %.0f", aqi);
-        it.print(622, 418, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Indoor Air Quality: GOOD  •  Ventilation Normal");
+        it.printf(622, 386, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "CO2: %.0f ppm", co2);
+        it.printf(810, 386, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "AQI: %.0f", aqi);
+        it.print(622, 418, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Indoor Air Quality: GOOD  •  Ventilation Normal");
       } else {
         int cur_mode = id(power_mode_index);
         bool ota_lock = id(ha_stay_awake_ota).state;
@@ -551,40 +551,40 @@ display:
           bool sel = (cur_mode == modes[i].mode_idx);
           draw_card(modes[i].x, 75, 290, 170, sel, 2);
           auto fg = sel ? COLOR_OFF : COLOR_ON;
-          it.print(modes[i].x + 18, 92, &id(font_bold_18), fg, TextAlign::TOP_LEFT, modes[i].title);
-          it.print(modes[i].x + 18, 128, &id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line1);
-          it.print(modes[i].x + 18, 150, &id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line2);
-          it.print(modes[i].x + 18, 185, &id(font_bold_14), fg, TextAlign::TOP_LEFT, modes[i].runtime);
-          it.print(modes[i].x + 18, 212, &id(font_bold_14), fg, TextAlign::TOP_LEFT, sel ? "[ ACTIVE PROFILE ]" : "TAP TO SELECT");
+          it.print(modes[i].x + 18, 92, id(font_bold_18), fg, TextAlign::TOP_LEFT, modes[i].title);
+          it.print(modes[i].x + 18, 128, id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line1);
+          it.print(modes[i].x + 18, 150, id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line2);
+          it.print(modes[i].x + 18, 185, id(font_bold_14), fg, TextAlign::TOP_LEFT, modes[i].runtime);
+          it.print(modes[i].x + 18, 212, id(font_bold_14), fg, TextAlign::TOP_LEFT, sel ? "[ ACTIVE PROFILE ]" : "TAP TO SELECT");
         }
 
         draw_card(20, 265, 290, 170, false, 2);
-        it.print(38, 280, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "1S LIPO TELEMETRY (GPIO14)");
-        it.printf(38, 304, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.2f V  (%.0f%%)", vbat, soc);
+        it.print(38, 280, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "1S LIPO TELEMETRY (GPIO14)");
+        it.printf(38, 304, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.2f V  (%.0f%%)", vbat, soc);
         it.rectangle(38, 342, 254, 18, COLOR_ON);
         int bar_w = (int)((soc / 100.0f) * 250.0f);
         if (bar_w < 0) bar_w = 0;
         if (bar_w > 250) bar_w = 250;
         it.filled_rectangle(40, 344, bar_w, 14, COLOR_ON);
-        it.printf(38, 372, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Refreshes: %d  •  Tap to Clean Screen", id(refresh_counter));
-        it.print(38, 398, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ANTI-GHOSTING CLEAN ]");
+        it.printf(38, 372, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Refreshes: %d  •  Tap to Clean Screen", id(refresh_counter));
+        it.print(38, 398, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ANTI-GHOSTING CLEAN ]");
 
         draw_card(335, 265, 290, 170, ota_lock, 2);
         auto fg2 = ota_lock ? COLOR_OFF : COLOR_ON;
-        it.print(353, 280, &id(font_bold_14), fg2, TextAlign::TOP_LEFT, "OTA STAY-AWAKE LOCK");
-        it.printf(353, 306, &id(font_bold_24), fg2, TextAlign::TOP_LEFT, "%s", ota_lock ? "LOCKED AWAKE" : "AUTO SLEEP OK");
+        it.print(353, 280, id(font_bold_14), fg2, TextAlign::TOP_LEFT, "OTA STAY-AWAKE LOCK");
+        it.printf(353, 306, id(font_bold_24), fg2, TextAlign::TOP_LEFT, "%s", ota_lock ? "LOCKED AWAKE" : "AUTO SLEEP OK");
         std::string wake = id(wake_reason_text).state;
         if (wake.empty()) wake = "Cold Boot / USB";
-        it.printf(353, 346, &id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wake: %s", wake.c_str());
-        it.printf(353, 370, &id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wi-Fi RSSI: %.0f dBm  •  Up: %.0fs", id(wifi_rssi).state, id(uptime_sec).state);
-        it.print(353, 398, &id(font_bold_14), fg2, TextAlign::TOP_LEFT, "[ TAP: TOGGLE OTA LOCK ]");
+        it.printf(353, 346, id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wake: %s", wake.c_str());
+        it.printf(353, 370, id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wi-Fi RSSI: %.0f dBm  •  Up: %.0fs", id(wifi_rssi).state, id(uptime_sec).state);
+        it.print(353, 398, id(font_bold_14), fg2, TextAlign::TOP_LEFT, "[ TAP: TOGGLE OTA LOCK ]");
 
         draw_card(650, 265, 290, 170, false, 2);
-        it.print(668, 280, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "DEEP SLEEP & BUTTON WAKE");
-        it.print(668, 306, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "SLEEP NOW");
-        it.print(668, 346, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Arms GPIO21 Side Button Wakeup");
-        it.print(668, 370, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "+ PCF8563 15m Timer (~350 uA)");
-        it.print(668, 398, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ENTER DEEP SLEEP ]");
+        it.print(668, 280, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "DEEP SLEEP & BUTTON WAKE");
+        it.print(668, 306, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "SLEEP NOW");
+        it.print(668, 346, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Arms GPIO21 Side Button Wakeup");
+        it.print(668, 370, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "+ PCF8563 15m Timer (~350 uA)");
+        it.print(668, 398, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ENTER DEEP SLEEP ]");
       }
 
       // 4. Bottom 4-Tab Navigation Bar (y: 476..540)
@@ -607,6 +607,6 @@ display:
         }
         auto fg = active ? COLOR_OFF : COLOR_ON;
         int cx = kTabs[i].x + kTabs[i].w / 2;
-        it.print(cx - 48, NAVBAR_Y + 19, &id(font_mdi_22), fg, TextAlign::TOP_CENTER, kTabs[i].icon);
-        it.print(cx + 14, NAVBAR_Y + 22, &id(font_bold_18), fg, TextAlign::TOP_CENTER, kTabs[i].title);
+        it.print(cx - 48, NAVBAR_Y + 19, id(font_mdi_22), fg, TextAlign::TOP_CENTER, kTabs[i].icon);
+        it.print(cx + 14, NAVBAR_Y + 22, id(font_bold_18), fg, TextAlign::TOP_CENTER, kTabs[i].title);
       }
