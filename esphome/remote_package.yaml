@@ -1,9 +1,9 @@
 # ==============================================================================
 # Remote Git Package Entrypoint for LilyGo T5 4.7" [H716] Dashboard
 # ==============================================================================
-# This file allows your local `/config/esphome/lilygo-t5-h716-dashboard.yaml`
-# to pull all substitutions, packages, C++ UI headers (`include/epd_dashboard_ui.h`),
-# and TrueType fonts (`fonts/*.ttf`) directly from GitHub on every compile!
+# Self-contained GitHub configuration: includes all substitutions, packages,
+# fonts, and the complete 4-Tab 960x540 C++ UI renderer inline so stale local
+# header files in `/config/esphome/include/` can never cause build conflicts!
 # ==============================================================================
 
 substitutions:
@@ -20,7 +20,9 @@ substitutions:
   quiet_start_hour: "23"
   quiet_end_hour: "6"
 
+  # ----------------------------------------------------------------------------
   # Tab 0: Smart Home Touch Controls (2x3)
+  # ----------------------------------------------------------------------------
   entity_ctrl_1: "scene.living_room_tv"
   label_ctrl_1: "Living Room TV"
 
@@ -42,11 +44,15 @@ substitutions:
   entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
   entity_power_profile: "input_select.lilygo_t5_power_profile"
 
+  # ----------------------------------------------------------------------------
   # Tab 1: Weather & 5-Day Forecast
+  # ----------------------------------------------------------------------------
   entity_weather: "weather.forecast_home"
   entity_weather_forecast_csv: "sensor.lilygo_t5_weather_forecast_compact"
 
+  # ----------------------------------------------------------------------------
   # Tab 2: Indoor Climate & HVAC Matrix
+  # ----------------------------------------------------------------------------
   entity_room1_temp: "sensor.living_room_temperature"
   entity_room1_hum: "sensor.thermostat_current_humidity"
   label_room1: "Living Room"
@@ -71,8 +77,6 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   comment: "LilyGo T5 4.7 E-Paper [H716] Touch & LiPo Dashboard for Home Assistant"
-  includes:
-    - include/epd_dashboard_ui.h
   on_boot:
     priority: 250.0
     then:
@@ -242,9 +246,367 @@ display:
     rotation: 0
     update_interval: never
     lambda: |-
-      epd_ui::DashboardLabels labels = {
-        "${label_ctrl_1}", "${label_ctrl_2}", "${label_ctrl_3}",
-        "${label_ctrl_4}", "${label_ctrl_5}", "${label_ctrl_6}",
-        "${label_room1}",  "${label_room2}",  "${label_room3}", "${label_room4}"
+      constexpr int SCREEN_W = 960;
+      constexpr int SCREEN_H = 540;
+      constexpr int HEADER_H = 56;
+      constexpr int NAVBAR_Y = 476;
+      constexpr int NAVBAR_H = 64;
+
+      auto draw_card = [&](int x, int y, int w, int h, bool inverted, int border_px) {
+        if (inverted) {
+          it.filled_rectangle(x, y, w, h, COLOR_ON);
+        } else {
+          it.filled_rectangle(x, y, w, h, COLOR_OFF);
+          for (int b = 0; b < border_px; b++) {
+            it.rectangle(x + b, y + b, w - 2 * b, h - 2 * b, COLOR_ON);
+          }
+        }
       };
-      epd_ui::render_dashboard(it, labels);
+
+      auto weather_to_mdi = [](const std::string &cond) -> const char * {
+        if (cond.find("partlycloudy") != std::string::npos || cond.find("partly") != std::string::npos)
+          return "\U000F0595";
+        if (cond.find("pouring") != std::string::npos)
+          return "\U000F0596";
+        if (cond.find("rain") != std::string::npos)
+          return "\U000F0597";
+        if (cond.find("lightning") != std::string::npos || cond.find("thunder") != std::string::npos)
+          return "\U000F0593";
+        if (cond.find("snow") != std::string::npos || cond.find("sleet") != std::string::npos || cond.find("hail") != std::string::npos)
+          return "\U000F0598";
+        if (cond.find("wind") != std::string::npos || cond.find("fog") != std::string::npos)
+          return "\U000F059D";
+        if (cond.find("night") != std::string::npos)
+          return "\U000F0594";
+        if (cond.find("cloud") != std::string::npos)
+          return "\U000F0590";
+        return "\U000F0599";
+      };
+
+      auto format_cond_label = [](const std::string &cond) -> std::string {
+        if (cond.empty() || cond == "unknown" || cond == "unavailable") return "Partly Cloudy";
+        if (cond == "partlycloudy") return "Partly Cloudy";
+        if (cond == "clear-night") return "Clear Night";
+        if (cond == "sunny") return "Sunny";
+        if (cond == "cloudy") return "Cloudy";
+        if (cond == "rainy") return "Rain Showers";
+        if (cond == "pouring") return "Heavy Rain";
+        if (cond == "lightning" || cond == "lightning-rainy") return "Thunderstorm";
+        if (cond == "snowy") return "Snow";
+        if (cond == "windy") return "Windy";
+        std::string out = cond;
+        out[0] = toupper(out[0]);
+        return out;
+      };
+
+      it.fill(COLOR_OFF);
+
+      // 1. Critical Low-Battery Protection Screen (< 3.32V)
+      float vbat = id(lipo_voltage).state;
+      if (!isnan(vbat) && vbat > 2.0f && vbat < 3.32f && !id(lipo_charging).state) {
+        draw_card(60, 50, 840, 440, false, 4);
+        it.print(480, 125, &id(font_mdi_48), COLOR_ON, TextAlign::TOP_CENTER, "\U000F0083");
+        it.print(480, 195, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "CRITICAL LIPO BATTERY");
+        it.printf(480, 250, &id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER,
+                  "Pack Voltage: %.2f V  (Cutoff Threshold: 3.32 V)", vbat);
+        it.line(120, 300, 840, 300, COLOR_ON);
+        it.print(480, 325, &id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER,
+                 "Entering hardware over-discharge protection mode (Deep Hibernate).");
+        it.print(480, 358, &id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER,
+                 "Connect a 5V USB-C cable to charge the 1S LiPo battery and resume.");
+        return;
+      }
+
+      // 2. Top Status Header Bar (y: 0..56)
+      it.filled_rectangle(0, 0, SCREEN_W, HEADER_H, COLOR_OFF);
+      it.line(0, HEADER_H - 1, SCREEN_W, HEADER_H - 1, COLOR_ON);
+      it.line(0, HEADER_H - 2, SCREEN_W, HEADER_H - 2, COLOR_ON);
+
+      auto now = id(rtc_time).now();
+      if (now.is_valid()) {
+        int hr12 = now.hour % 12;
+        if (hr12 == 0) hr12 = 12;
+        const char *ampm = (now.hour >= 12) ? "PM" : "AM";
+        char time_buf[32];
+        snprintf(time_buf, sizeof(time_buf), "%d:%02d %s", hr12, now.minute, ampm);
+        it.print(16, 8, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, time_buf);
+
+        char date_buf[32];
+        now.strftime(date_buf, sizeof(date_buf), "%a, %b %d");
+        it.print(16, 35, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, date_buf);
+      } else {
+        it.print(16, 10, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "12:00 PM");
+        it.print(16, 35, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Syncing RTC...");
+      }
+
+      float rssi = id(wifi_rssi).state;
+      const char *wifi_icon = (!isnan(rssi) && rssi > -95.0f) ? "\U000F05A9" : "\U000F05AA";
+      it.print(318, 16, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, wifi_icon);
+
+      const char *mode_label = "ADAPTIVE HYBRID";
+      if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
+      else if (id(power_mode_index) == 2) mode_label = "MAX BATTERY";
+
+      draw_card(350, 12, 195, 32, false, 1);
+      it.print(447, 19, &id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, mode_label);
+
+      float soc = id(lipo_battery_level).state;
+      bool chg  = id(lipo_charging).state;
+      if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
+
+      const char *bat_icon = chg ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
+      it.print(560, 15, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
+      it.printf(588, 11, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
+      it.printf(588, 33, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
+                chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA STAY-AWAKE" : "1S LIPO ACTIVE"));
+
+      draw_card(740, 8, 105, 40, false, 2);
+      it.print(752, 17, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
+      it.print(780, 20, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "CLEAN");
+
+      draw_card(846, 8, 104, 40, false, 2);
+      it.print(856, 17, &id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F04B2");
+      it.print(884, 20, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MODE");
+
+      // 3. Main Tab Body (y: 57..475)
+      int cur_tab = id(active_tab);
+      if (cur_tab == 0) {
+        struct ControlCard {
+          int x; int y;
+          const char *title; const char *subtitle;
+          const char *icon_on; const char *icon_off;
+          bool state;
+          const char *state_on_label; const char *state_off_label;
+        };
+        ControlCard cards[6] = {
+          { 20,  75, "${label_ctrl_1}", "Home Assistant Scene", "\U000F07D0", "\U000F07D0", id(ctrl_1_state), "ACTIVE", "TAP TO RUN" },
+          {335,  75, "${label_ctrl_2}", "Smart Light Group",    "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
+          {650,  75, "${label_ctrl_3}", "Home Assistant Scene", "\U000F0335", "\U000F0336", id(ctrl_3_state), "ACTIVE", "TAP TO RUN" },
+          { 20, 265, "${label_ctrl_4}", "Indoor Light Strip",   "\U000F0335", "\U000F0336", id(ctrl_4_state), "ON",     "OFF" },
+          {335, 265, "${label_ctrl_5}", "Smart Switch Control", "\U000F0425", "\U000F0425", id(ctrl_5_state), "ON",     "OFF" },
+          {650, 265, "${label_ctrl_6}", "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
+        };
+        int active_count = 0;
+        for (int i = 0; i < 6; i++) {
+          bool is_on = cards[i].state;
+          if (is_on) active_count++;
+          draw_card(cards[i].x, cards[i].y, 290, 170, is_on, 2);
+          auto fg = is_on ? COLOR_OFF : COLOR_ON;
+          const char *ico = is_on ? cards[i].icon_on : cards[i].icon_off;
+          const char *st_txt = is_on ? cards[i].state_on_label : cards[i].state_off_label;
+          it.print(cards[i].x + 22, cards[i].y + 22, &id(font_mdi_32), fg, TextAlign::TOP_LEFT, ico);
+          it.print(cards[i].x + 268, cards[i].y + 26, &id(font_bold_18), fg, TextAlign::TOP_RIGHT, st_txt);
+          it.print(cards[i].x + 22, cards[i].y + 92, &id(font_bold_24), fg, TextAlign::TOP_LEFT, cards[i].title);
+          it.print(cards[i].x + 22, cards[i].y + 128, &id(font_regular_14), fg, TextAlign::TOP_LEFT, cards[i].subtitle);
+        }
+        if (id(last_touch_x) >= 0 && id(last_touch_y) >= 0) {
+          it.printf(24, 448, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
+                    "GT911 Touch Ready (Last Tap: X=%d, Y=%d)  •  %d of 6 Active  •  Tap any card to toggle",
+                    id(last_touch_x), id(last_touch_y), active_count);
+        } else {
+          it.printf(24, 448, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
+                    "GT911 Capacitive Touch Ready  •  %d of 6 Entities Active  •  Tap any card to toggle",
+                    active_count);
+        }
+      } else if (cur_tab == 1) {
+        draw_card(20, 75, 400, 380, false, 2);
+        std::string cond = id(ha_weather_condition).state;
+        float temp  = id(ha_weather_temp).state;
+        float feels = id(ha_weather_feels_like).state;
+        float hum   = id(ha_weather_humidity).state;
+        float wind  = id(ha_weather_wind_speed).state;
+        float uv    = id(ha_weather_uv).state;
+        float press = id(ha_weather_pressure).state;
+        if (isnan(temp))  temp  = 72.0f;
+        if (isnan(feels)) feels = 70.0f;
+        if (isnan(hum))   hum   = 46.0f;
+        if (isnan(wind))  wind  = 8.4f;
+        if (isnan(uv))    uv    = 5.0f;
+        if (isnan(press)) press = 1016.0f;
+
+        it.print(44, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "OUTDOOR CONDITIONS");
+        it.print(52, 130, &id(font_mdi_48), COLOR_ON, TextAlign::TOP_LEFT, weather_to_mdi(cond));
+        it.printf(132, 125, &id(font_bold_48), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", temp);
+        it.printf(134, 182, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%s", format_cond_label(cond).c_str());
+        it.line(44, 224, 396, 224, COLOR_ON);
+
+        it.print(44, 242, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "FEELS LIKE");
+        it.printf(44, 264, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", feels);
+        it.print(230, 242, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "HUMIDITY");
+        it.printf(230, 264, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%%", hum);
+        it.print(44, 315, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "WIND SPEED");
+        it.printf(44, 337, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.1f mph", wind);
+        it.print(230, 315, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "UV INDEX");
+        it.printf(230, 337, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.0f", uv);
+        it.print(44, 388, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "BAROMETRIC PRESSURE");
+        it.printf(44, 410, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f hPa", press);
+
+        draw_card(440, 75, 500, 380, false, 2);
+        it.print(464, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "5-DAY OUTLOOK (COMPACT HA STREAM)");
+        struct ForecastDay { std::string day; std::string cond; int hi; int lo; };
+        ForecastDay days[5] = {
+          {"MON", "sunny", 75, 58}, {"TUE", "partlycloudy", 73, 56},
+          {"WED", "rainy", 66, 52}, {"THU", "partlycloudy", 70, 54},
+          {"FRI", "sunny", 76, 59}
+        };
+        std::string csv = id(ha_weather_forecast_csv).state;
+        if (!csv.empty() && csv != "unknown" && csv != "unavailable") {
+          int idx = 0; size_t start = 0;
+          while (idx < 5 && start < csv.size()) {
+            size_t end = csv.find(';', start);
+            if (end == std::string::npos) end = csv.size();
+            std::string token = csv.substr(start, end - start);
+            size_t p1 = token.find('|');
+            size_t p2 = (p1 != std::string::npos) ? token.find('|', p1 + 1) : std::string::npos;
+            size_t p3 = (p2 != std::string::npos) ? token.find('|', p2 + 1) : std::string::npos;
+            if (p1 != std::string::npos && p2 != std::string::npos && p3 != std::string::npos) {
+              days[idx].day  = token.substr(0, p1);
+              days[idx].cond = token.substr(p1 + 1, p2 - p1 - 1);
+              days[idx].hi   = atoi(token.substr(p2 + 1, p3 - p2 - 1).c_str());
+              days[idx].lo   = atoi(token.substr(p3 + 1).c_str());
+              idx++;
+            }
+            start = end + 1;
+          }
+        }
+        for (int i = 0; i < 5; i++) {
+          int col_x = 452 + i * 96;
+          int cx = col_x + 44;
+          if (i > 0) it.line(col_x, 125, col_x, 435, COLOR_ON);
+          it.print(cx, 130, &id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER, days[i].day.c_str());
+          it.print(cx, 175, &id(font_mdi_32), COLOR_ON, TextAlign::TOP_CENTER, weather_to_mdi(days[i].cond));
+          it.printf(cx, 232, &id(font_bold_24), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].hi);
+          it.rectangle(cx - 6, 272, 12, 96, COLOR_ON);
+          it.filled_rectangle(cx - 4, 286, 8, 64, COLOR_ON);
+          it.printf(cx, 382, &id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER, "%d°", days[i].lo);
+        }
+      } else if (cur_tab == 2) {
+        struct RoomCard { int x; int y; const char *name; float temp; float hum; bool is_espresso; };
+        RoomCard rooms[4] = {
+          { 20,  75, "${label_room1}", id(ha_room1_temp).state, id(ha_room1_hum).state, false},
+          {310,  75, "${label_room2}", id(ha_room2_temp).state, id(ha_room2_hum).state, false},
+          { 20, 270, "${label_room3}", id(ha_room3_temp).state, id(ha_room3_hum).state, false},
+          {310, 270, "${label_room4}", id(ha_room4_temp).state, id(ha_room4_hum).state, true}
+        };
+        float fallback_t[4] = {71.4f, 68.8f, 73.1f, 198.5f};
+        float fallback_h[4] = {44.0f, 48.0f, 41.0f, 0.0f};
+        for (int i = 0; i < 4; i++) {
+          float rt = isnan(rooms[i].temp) ? fallback_t[i] : rooms[i].temp;
+          float rh = isnan(rooms[i].hum)  ? fallback_h[i] : rooms[i].hum;
+          draw_card(rooms[i].x, rooms[i].y, 270, 185, false, 2);
+          it.print(rooms[i].x + 18, rooms[i].y + 16, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, rooms[i].name);
+          it.printf(rooms[i].x + 18, rooms[i].y + 54, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.1f°", rt);
+          if (rooms[i].is_espresso) {
+            it.print(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Decent DE1Pro Head");
+            const char *brew_state = (!isnan(rooms[i].temp) && rooms[i].temp > 175.0f) ? "BREW TEMP READY" : "STANDBY / WARMING";
+            it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, brew_state);
+          } else {
+            it.printf(rooms[i].x + 18, rooms[i].y + 114, &id(font_regular_18), COLOR_ON, TextAlign::TOP_LEFT, "Humidity: %.0f%%", rh);
+            const char *comfort = (rt >= 67.0f && rt <= 74.0f && rh >= 35.0f && rh <= 55.0f) ? "OPTIMAL COMFORT" : "CHECK ZONE";
+            it.print(rooms[i].x + 18, rooms[i].y + 148, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, comfort);
+          }
+        }
+
+        draw_card(600, 75, 340, 380, false, 2);
+        it.print(622, 92, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "MAIN HVAC THERMOSTAT");
+        std::string hvac_mode   = id(ha_hvac_mode).state;
+        std::string hvac_action = id(ha_hvac_action).state;
+        if (hvac_mode.empty() || hvac_mode == "unknown") hvac_mode = "cool";
+        if (hvac_action.empty() || hvac_action == "unknown") hvac_action = "idle";
+        float cur_t = id(ha_hvac_current_temp).state;
+        float tgt_t = id(ha_hvac_target_temp).state;
+        if (isnan(cur_t)) cur_t = 71.0f;
+        if (isnan(tgt_t)) tgt_t = 70.0f;
+
+        it.printf(622, 122, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "Mode: %s (%s)", hvac_mode.c_str(), hvac_action.c_str());
+        it.print(622, 165, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "CURRENT");
+        it.printf(622, 188, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", cur_t);
+        it.print(790, 165, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "TARGET SETPOINT");
+        it.printf(790, 188, &id(font_bold_36), COLOR_ON, TextAlign::TOP_LEFT, "%.0f°F", tgt_t);
+
+        draw_card(625, 295, 85, 60, false, 2);
+        it.print(667, 307, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "-");
+        it.print(770, 315, &id(font_bold_14), COLOR_ON, TextAlign::TOP_CENTER, "ADJUST");
+        draw_card(830, 295, 85, 60, false, 2);
+        it.print(872, 307, &id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "+");
+
+        it.line(622, 372, 918, 372, COLOR_ON);
+        float co2 = id(ha_indoor_co2).state;
+        float aqi = id(ha_indoor_aqi).state;
+        if (isnan(co2)) co2 = 540.0f;
+        if (isnan(aqi)) aqi = 18.0f;
+        it.printf(622, 386, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "CO2: %.0f ppm", co2);
+        it.printf(810, 386, &id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "AQI: %.0f", aqi);
+        it.print(622, 418, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Indoor Air Quality: GOOD  •  Ventilation Normal");
+      } else {
+        int cur_mode = id(power_mode_index);
+        bool ota_lock = id(ha_stay_awake_ota).state;
+        struct ModeCard { int x; int mode_idx; const char *title; const char *line1; const char *line2; const char *runtime; };
+        ModeCard modes[3] = {
+          { 20, 0, "1. ALWAYS ONLINE",   "Wi-Fi Light Modem Sleep",   "Instant HA Push Updates",   "~5-6 Days (3000mAh)"},
+          {335, 1, "2. ADAPTIVE HYBRID", "Daytime Live / Night Sleep", "Auto Deep Sleep <35% SoC",  "~3-5 Weeks (Recommended)"},
+          {650, 2, "3. MAX BATTERY",     "15m Periodic Timer Wake",   "+ GPIO21 Button Wakeup",    "~3-5 Months (3000mAh)"}
+        };
+        for (int i = 0; i < 3; i++) {
+          bool sel = (cur_mode == modes[i].mode_idx);
+          draw_card(modes[i].x, 75, 290, 170, sel, 2);
+          auto fg = sel ? COLOR_OFF : COLOR_ON;
+          it.print(modes[i].x + 18, 92, &id(font_bold_18), fg, TextAlign::TOP_LEFT, modes[i].title);
+          it.print(modes[i].x + 18, 128, &id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line1);
+          it.print(modes[i].x + 18, 150, &id(font_regular_14), fg, TextAlign::TOP_LEFT, modes[i].line2);
+          it.print(modes[i].x + 18, 185, &id(font_bold_14), fg, TextAlign::TOP_LEFT, modes[i].runtime);
+          it.print(modes[i].x + 18, 212, &id(font_bold_14), fg, TextAlign::TOP_LEFT, sel ? "[ ACTIVE PROFILE ]" : "TAP TO SELECT");
+        }
+
+        draw_card(20, 265, 290, 170, false, 2);
+        it.print(38, 280, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "1S LIPO TELEMETRY (GPIO14)");
+        it.printf(38, 304, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.2f V  (%.0f%%)", vbat, soc);
+        it.rectangle(38, 342, 254, 18, COLOR_ON);
+        int bar_w = (int)((soc / 100.0f) * 250.0f);
+        if (bar_w < 0) bar_w = 0;
+        if (bar_w > 250) bar_w = 250;
+        it.filled_rectangle(40, 344, bar_w, 14, COLOR_ON);
+        it.printf(38, 372, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Refreshes: %d  •  Tap to Clean Screen", id(refresh_counter));
+        it.print(38, 398, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ANTI-GHOSTING CLEAN ]");
+
+        draw_card(335, 265, 290, 170, ota_lock, 2);
+        auto fg2 = ota_lock ? COLOR_OFF : COLOR_ON;
+        it.print(353, 280, &id(font_bold_14), fg2, TextAlign::TOP_LEFT, "OTA STAY-AWAKE LOCK");
+        it.printf(353, 306, &id(font_bold_24), fg2, TextAlign::TOP_LEFT, "%s", ota_lock ? "LOCKED AWAKE" : "AUTO SLEEP OK");
+        std::string wake = id(wake_reason_text).state;
+        if (wake.empty()) wake = "Cold Boot / USB";
+        it.printf(353, 346, &id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wake: %s", wake.c_str());
+        it.printf(353, 370, &id(font_regular_14), fg2, TextAlign::TOP_LEFT, "Wi-Fi RSSI: %.0f dBm  •  Up: %.0fs", id(wifi_rssi).state, id(uptime_sec).state);
+        it.print(353, 398, &id(font_bold_14), fg2, TextAlign::TOP_LEFT, "[ TAP: TOGGLE OTA LOCK ]");
+
+        draw_card(650, 265, 290, 170, false, 2);
+        it.print(668, 280, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "DEEP SLEEP & BUTTON WAKE");
+        it.print(668, 306, &id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "SLEEP NOW");
+        it.print(668, 346, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Arms GPIO21 Side Button Wakeup");
+        it.print(668, 370, &id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "+ PCF8563 15m Timer (~350 uA)");
+        it.print(668, 398, &id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "[ TAP: ENTER DEEP SLEEP ]");
+      }
+
+      // 4. Bottom 4-Tab Navigation Bar (y: 476..540)
+      it.line(0, NAVBAR_Y, SCREEN_W, NAVBAR_Y, COLOR_ON);
+      it.line(0, NAVBAR_Y + 1, SCREEN_W, NAVBAR_Y + 1, COLOR_ON);
+      struct TabItem { int x; int w; const char *icon; const char *title; };
+      static const TabItem kTabs[4] = {
+        {  0, 240, "\U000F07D0", "CONTROLS"},
+        {240, 240, "\U000F0595", "WEATHER"},
+        {480, 240, "\U000F050F", "CLIMATE"},
+        {720, 240, "\U000F0079", "LIPO & POWER"}
+      };
+      for (int i = 0; i < 4; i++) {
+        bool active = (cur_tab == i);
+        if (active) {
+          it.filled_rectangle(kTabs[i].x, NAVBAR_Y + 2, kTabs[i].w, NAVBAR_H - 2, COLOR_ON);
+        } else {
+          it.filled_rectangle(kTabs[i].x, NAVBAR_Y + 2, kTabs[i].w, NAVBAR_H - 2, COLOR_OFF);
+          if (i > 0) it.line(kTabs[i].x, NAVBAR_Y + 2, kTabs[i].x, SCREEN_H, COLOR_ON);
+        }
+        auto fg = active ? COLOR_OFF : COLOR_ON;
+        int cx = kTabs[i].x + kTabs[i].w / 2;
+        it.print(cx - 48, NAVBAR_Y + 19, &id(font_mdi_22), fg, TextAlign::TOP_CENTER, kTabs[i].icon);
+        it.print(cx + 14, NAVBAR_Y + 22, &id(font_bold_18), fg, TextAlign::TOP_CENTER, kTabs[i].title);
+      }
