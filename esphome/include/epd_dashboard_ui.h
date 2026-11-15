@@ -207,12 +207,12 @@ inline void render_tab_controls(esphome::display::Display &it) {
   };
 
   ControlCard cards[6] = {
-    { 20,  75, "Living Room",    "Main Dimmable Lights", "\U000F0335", "\U000F0336", id(ha_ctrl_1).state, "ON",     "OFF" },
-    {335,  75, "Kitchen Lights", "Island Pendant Group", "\U000F08DD", "\U000F0336", id(ha_ctrl_2).state, "ON",     "OFF" },
-    {650,  75, "Office Desk",    "Workstation Power",    "\U000F0425", "\U000F0425", id(ha_ctrl_3).state, "ON",     "OFF" },
-    { 20, 265, "Front Door",     "Smart Deadbolt Lock",  "\U000F033E", "\U000F033F", id(ha_ctrl_4).state, "LOCKED", "UNLOCKED" },
-    {335, 265, "Garage Door",    "Overhead Roll Cover",  "\U000F06DA", "\U000F06D9", id(ha_ctrl_5).state, "OPEN",   "CLOSED" },
-    {650, 265, "Goodnight",      "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ha_ctrl_6).state, "ACTIVE", "TAP TO RUN" }
+    { 20,  75, "Living Room",    "Main Dimmable Lights", "\U000F0335", "\U000F0336", id(ctrl_1_state), "ON",     "OFF" },
+    {335,  75, "Kitchen Lights", "Island Pendant Group", "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
+    {650,  75, "Office Desk",    "Workstation Power",    "\U000F0425", "\U000F0425", id(ctrl_3_state), "ON",     "OFF" },
+    { 20, 265, "Front Door",     "Smart Deadbolt Lock",  "\U000F033E", "\U000F033F", id(ctrl_4_state), "LOCKED", "UNLOCKED" },
+    {335, 265, "Garage Door",    "Overhead Roll Cover",  "\U000F06DA", "\U000F06D9", id(ctrl_5_state), "OPEN",   "CLOSED" },
+    {650, 265, "Goodnight",      "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
   };
 
   int active_count = 0;
@@ -233,9 +233,15 @@ inline void render_tab_controls(esphome::display::Display &it) {
   }
 
   // Bottom Status Strip (y: 444..470)
-  it.printf(24, 448, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "GT911 Capacitive Touch Ready  •  %d of 6 Entities Active  •  Tap any card to toggle via Home Assistant API",
-            active_count);
+  if (id(last_touch_x) >= 0 && id(last_touch_y) >= 0) {
+    it.printf(24, 448, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+              "GT911 Touch Ready (Last Tap: X=%d, Y=%d)  •  %d of 6 Entities Active  •  Tap any card to toggle",
+              id(last_touch_x), id(last_touch_y), active_count);
+  } else {
+    it.printf(24, 448, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+              "GT911 Capacitive Touch Ready  •  %d of 6 Entities Active  •  Tap any card to toggle via Home Assistant API",
+              active_count);
+  }
 }
 
 // ==============================================================================

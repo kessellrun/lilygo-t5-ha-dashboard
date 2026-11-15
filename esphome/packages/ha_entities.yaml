@@ -15,6 +15,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_1_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'
@@ -27,6 +28,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_2_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'
@@ -39,6 +41,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_3_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'
@@ -51,6 +54,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_4_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'
@@ -63,6 +67,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_5_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'
@@ -75,6 +80,7 @@ binary_sensor:
     trigger_on_initial_state: true
     on_state:
       then:
+        - lambda: 'id(ctrl_6_state) = x;'
         - if:
             condition:
               lambda: 'return id(active_tab) == 0;'

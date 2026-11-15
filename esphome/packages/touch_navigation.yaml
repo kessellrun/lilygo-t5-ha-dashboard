@@ -128,6 +128,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_1_state) = !id(ctrl_1_state);'
               - homeassistant.service:
                   service: homeassistant.toggle
                   data:
@@ -161,6 +162,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_2_state) = !id(ctrl_2_state);'
               - homeassistant.service:
                   service: homeassistant.toggle
                   data:
@@ -194,6 +196,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_3_state) = !id(ctrl_3_state);'
               - homeassistant.service:
                   service: homeassistant.toggle
                   data:
@@ -241,6 +244,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_4_state) = !id(ctrl_4_state);'
               - if:
                   condition:
                     lambda: 'return id(ha_ctrl_4).state;'
@@ -277,6 +281,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_5_state) = !id(ctrl_5_state);'
               - homeassistant.service:
                   service: cover.toggle
                   data:
@@ -308,6 +313,7 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
+              - lambda: 'id(ctrl_6_state) = !id(ctrl_6_state);'
               - homeassistant.service:
                   service: scene.turn_on
                   data:

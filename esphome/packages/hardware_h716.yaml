@@ -77,18 +77,25 @@ time:
           - script.execute: evaluate_power_state
 
 # ==============================================================================
-# Goodix GT911 Capacitive Touchscreen Controller (INT = GPIO47 on ESP32-S3 H716)
+# Goodix GT911 Capacitive Touchscreen Controller (via lilygo_t5_47_plus driver)
+# Uses `swap_xy: true` and `mirror_y: true` to align the portrait GT911 sensor
+# with the 960x540 landscape ED047TC1 display.
 # ==============================================================================
 touchscreen:
-  - platform: gt911
+  - platform: lilygo_t5_47_plus
     id: gt911_touch
     i2c_id: i2c_bus
-    interrupt_pin: GPIO47
     display: epaper_display
+    update_interval: 100ms
+    transform:
+      swap_xy: true
+      mirror_y: true
     on_touch:
       then:
         - lambda: |-
             id(last_touch_ms) = millis();
+            id(last_touch_x) = touch.x;
+            id(last_touch_y) = touch.y;
             if (id(rtc_time).now().is_valid()) {
               id(last_touch_epoch) = id(rtc_time).now().timestamp;
             }

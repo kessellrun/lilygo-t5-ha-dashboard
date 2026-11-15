@@ -72,6 +72,50 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  # Last transformed touch X/Y coordinates (for on-screen feedback)
+  - id: last_touch_x
+    type: int
+    restore_value: false
+    initial_value: '-1'
+
+  - id: last_touch_y
+    type: int
+    restore_value: false
+    initial_value: '-1'
+
+  # Local/optimistic toggle states for Tab 0 Control Cards (1..6)
+  # Synced with Home Assistant entities when connected, and toggled immediately
+  # on screen tap so buttons respond visually even before HA entities are mapped.
+  - id: ctrl_1_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: ctrl_2_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: ctrl_3_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: ctrl_4_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: ctrl_5_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: ctrl_6_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
   # Previous ADC sample voltage for positive dV/dt charging detection
   - id: prev_lipo_voltage
     type: float
