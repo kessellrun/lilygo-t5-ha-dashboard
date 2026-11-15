@@ -1,0 +1,184 @@
+# ==============================================================================
+# Remote Git Package Entrypoint for LilyGo T5 4.7" [H716] Dashboard
+# ==============================================================================
+# This file allows your local `/config/esphome/lilygo-t5-h716-dashboard.yaml`
+# to pull all packages, C++ UI headers (`include/epd_dashboard_ui.h`), and
+# TrueType fonts (`fonts/*.ttf`) directly from GitHub on every compile!
+# ==============================================================================
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "LilyGo T5 4.7 E-Paper [H716] Touch & LiPo Dashboard for Home Assistant"
+  includes:
+    - include/epd_dashboard_ui.h
+  on_boot:
+    priority: 250.0
+    then:
+      - lambda: |-
+          auto cause = esp_sleep_get_wakeup_cause();
+          if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
+            id(wake_reason_text).publish_state("GPIO21 Wake Button");
+          } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+            id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
+          } else {
+            id(wake_reason_text).publish_state("Cold Boot / USB Reset");
+          }
+          id(last_touch_ms) = millis();
+      - delay: 2s
+      - script.execute: request_screen_refresh
+
+packages:
+  hardware_h716: !include packages/hardware_h716.yaml
+  lipo_power_manager: !include packages/lipo_power_manager.yaml
+  ha_entities: !include packages/ha_entities.yaml
+  touch_navigation: !include packages/touch_navigation.yaml
+
+logger:
+  level: INFO
+  baud_rate: 115200
+  hardware_uart: USB_SERIAL_JTAG
+
+api:
+  id: ha_api
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    id: esphome_ota
+    password: !secret ota_password
+    on_begin:
+      then:
+        - logger.log: "OTA Firmware Update Started — preventing Deep Sleep"
+        - deep_sleep.prevent: deep_sleep_ctrl
+
+font:
+  - file: "fonts/Roboto-Regular.ttf"
+    id: font_regular_14
+    size: 14
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_14
+    size: 14
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: font_regular_18
+    size: 18
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_18
+    size: 18
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_24
+    size: 24
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_36
+    size: 36
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: font_bold_48
+    size: 48
+    glyphs: ' !"%()+-.,/:0123456789°ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz•|_'
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_22
+    size: 22
+    glyphs:
+      - "\U000F0599"
+      - "\U000F0590"
+      - "\U000F0595"
+      - "\U000F0597"
+      - "\U000F0596"
+      - "\U000F0593"
+      - "\U000F0598"
+      - "\U000F059D"
+      - "\U000F0594"
+      - "\U000F0335"
+      - "\U000F0336"
+      - "\U000F08DD"
+      - "\U000F0425"
+      - "\U000F033E"
+      - "\U000F033F"
+      - "\U000F06D9"
+      - "\U000F06DA"
+      - "\U000F050F"
+      - "\U000F058E"
+      - "\U000F0238"
+      - "\U000F0717"
+      - "\U000F0210"
+      - "\U000F0079"
+      - "\U000F0084"
+      - "\U000F0083"
+      - "\U000F05A9"
+      - "\U000F05AA"
+      - "\U000F0450"
+      - "\U000F04B2"
+      - "\U000F07D0"
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_32
+    size: 32
+    glyphs:
+      - "\U000F0599"
+      - "\U000F0590"
+      - "\U000F0595"
+      - "\U000F0597"
+      - "\U000F0596"
+      - "\U000F0593"
+      - "\U000F0598"
+      - "\U000F059D"
+      - "\U000F0594"
+      - "\U000F0335"
+      - "\U000F0336"
+      - "\U000F08DD"
+      - "\U000F0425"
+      - "\U000F033E"
+      - "\U000F033F"
+      - "\U000F06D9"
+      - "\U000F06DA"
+      - "\U000F050F"
+      - "\U000F058E"
+      - "\U000F0238"
+      - "\U000F0717"
+      - "\U000F0210"
+      - "\U000F0079"
+      - "\U000F0084"
+      - "\U000F0083"
+      - "\U000F05A9"
+      - "\U000F05AA"
+      - "\U000F0450"
+      - "\U000F04B2"
+      - "\U000F07D0"
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_mdi_48
+    size: 48
+    glyphs:
+      - "\U000F0599"
+      - "\U000F0590"
+      - "\U000F0595"
+      - "\U000F0597"
+      - "\U000F0596"
+      - "\U000F0593"
+      - "\U000F0598"
+      - "\U000F059D"
+      - "\U000F0594"
+      - "\U000F0083"
+
+display:
+  - platform: lilygo_t5_47_plus
+    id: epaper_display
+    rotation: 0
+    update_interval: never
+    lambda: |-
+      epd_ui::render_dashboard(it);
