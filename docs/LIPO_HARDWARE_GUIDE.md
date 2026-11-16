@@ -133,3 +133,22 @@ Both `esphome/packages/lipo_power_manager.yaml` and the browser simulator (`simu
 | **Wi-Fi Light Modem Sleep (`DTIM` listening, `epd_poweroff()`)** | `~18–24 mA` | Daytime active window in **Always Online** & **Adaptive Hybrid** (`SoC > 35%`) |
 | **Touch-Armed Deep Sleep (`ESP32-S3 Deep Sleep + GT911 Idle`)** | `~0.18–0.32 mA` (`180–320 µA`) | Used overnight (`23:00–06:00`), after idle timeout in **Adaptive Hybrid**, and full-time in **Max Battery** mode |
 | **Critical Hibernate (`< 3.32V`, timer wake disabled)** | `~0.08 mA` (`80 µA`) | Protects the 1S LiPo cell from falling below its `2.8V` PCM hardware trip point |
+
+### 3.4 Older LiPo Cells (ESR Voltage Sag) & Wake Cycle Timing
+
+#### Voltage Sag & Rebound on Aging 1S LiPo Cells
+As a 1S LiPo pouch cell ages (or operates in cooler ambient temperatures), its **Equivalent Series Resistance (ESR)** increases. During an active wake cycle—when the ESP32-S3 radio transmits over Wi-Fi and the ED047TC1 high-voltage boost rails charge for an E-Paper refresh—total battery draw briefly peaks at **`~115–250 mA`**.
+
+- **Temporary Voltage Sag (`0.10V–0.25V`):** Across an aged cell with higher ESR (e.g., `400–800 mΩ`), that `~115–250 mA` load burst produces a temporary `0.10V–0.25V` drop at the `VBAT` terminal (and therefore at `GPIO14`), causing reported SoC/voltage to dip slightly while Wi-Fi and the display boost converter are active.
+- **Deep Sleep Voltage Rebound:** As soon as the ESP32-S3 finishes refreshing the E-Paper panel, powers down the display rails (`epd_poweroff()`), and enters Deep Sleep (`~0.18–0.32 mA`), the load current drops by ~1,000× and the open-circuit cell voltage rebounds back up by `0.10V–0.25V`.
+- **Why Short, Deterministic Wake Windows Matter:** Keeping active Wi-Fi + refresh bursts short prevents sustained sag from prematurely crossing the `3.45V` warning or `3.32V` critical-hibernate thresholds and preserves usable capacity on older cells. Note also that `GPIO14` samples `VBAT` immediately at boot so telemetry is captured cleanly without waiting 30 seconds.
+
+#### Exact Awake Windows by Power Mode & Wake Source
+The firmware distinguishes between an unattended **15-minute periodic timer wake** (`ESP_SLEEP_WAKEUP_TIMER`) and an intentional **user interaction wake** (touching the GT911 screen or pressing the `GPIO21` side button):
+
+| Mode / Wake Source | Awake Window | Substitution Key | Behavior |
+| :--- | :---: | :--- | :--- |
+| **Periodic 15-Minute Timer Wake** (Max Battery, or Adaptive Hybrid overnight / `SoC <= 35%`) | **`12s`** | `timer_wake_sync_sec` | Connects to Wi-Fi, syncs HA states/time, performs a single E-Paper update, and returns straight to Deep Sleep unless the user taps the screen during the sync. |
+| **Touch / `GPIO21` Button Wake — Max Battery Mode** (`mode = 2`) | **`30s`** | `max_battery_touch_timeout_sec` | Keeps Wi-Fi and touch active for `30s` after the last tap so you can toggle devices or switch tabs, then re-arms Deep Sleep. |
+| **Touch / `GPIO21` Button Wake — Adaptive Hybrid Mode** (`mode = 1`) | **`90s`** | `inactivity_timeout_sec` | Keeps the panel responsive for `90s` after the last tap before re-entering Deep Sleep during Quiet Hours or when `SoC <= 35%`. |
+| **Always Online Mode** (`mode = 0`) | **Continuous** | — | Stays connected in Wi-Fi Light Modem Sleep (`DTIM` listening) unless critical `< 3.32V` protection triggers. |

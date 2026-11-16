@@ -40,6 +40,10 @@ substitutions:
   hybrid_sleep_soc_threshold: "35"
   # Seconds of touch inactivity before Adaptive Hybrid mode evaluates sleep
   inactivity_timeout_sec: "90"
+  # Interactive awake window after a touch/button wake in Max Battery mode
+  max_battery_touch_timeout_sec: "30"
+  # Brief awake window for periodic 15-minute timer wakes when untouched
+  timer_wake_sync_sec: "12"
 
   # ----------------------------------------------------------------------------
   # 4. Quiet Hours (Overnight Deep Sleep Window in 24-Hour Local Time)
@@ -74,6 +78,8 @@ substitutions:
   # Companion Helper Entities (defined in homeassistant/packages/lilygo_t5_dashboard.yaml)
   entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
   entity_power_profile: "input_select.lilygo_t5_power_profile"
+  entity_quiet_start: "input_number.lilygo_t5_quiet_hours_start"
+  entity_quiet_end: "input_number.lilygo_t5_quiet_hours_end"
 
   # ----------------------------------------------------------------------------
   # 6. Home Assistant Entity Mapping — Tab 1: Weather & 5-Day Forecast
@@ -121,12 +127,18 @@ esphome:
           auto cause = esp_sleep_get_wakeup_cause();
           if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
             id(wake_reason_text).publish_state("GPIO21 Wake Button");
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
           } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
             id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
+            id(is_timer_wake) = true;
+            id(last_touch_ms) = 0;
           } else {
             id(wake_reason_text).publish_state("Cold Boot / USB Reset");
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
           }
-          id(last_touch_ms) = millis();
+          id(lipo_voltage).update();
       - delay: 2s
       - script.execute: request_screen_refresh
 

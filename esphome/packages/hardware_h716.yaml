@@ -48,7 +48,7 @@ i2c:
     sda: GPIO18
     scl: GPIO17
     frequency: 400kHz
-    scan: true
+    scan: false
 
 # ==============================================================================
 # Dual Time Sources: Onboard PCF8563 Hardware RTC + Home Assistant Network Sync
@@ -73,7 +73,11 @@ time:
       - seconds: 0
         minutes: /1
         then:
-          - script.execute: request_screen_refresh
+          - if:
+              condition:
+                lambda: 'return !id(is_timer_wake);'
+              then:
+                - script.execute: request_screen_refresh
           - script.execute: evaluate_power_state
 
 # ==============================================================================
@@ -93,6 +97,7 @@ touchscreen:
     on_touch:
       then:
         - lambda: |-
+            id(is_timer_wake) = false;
             id(last_touch_ms) = millis();
             id(last_touch_x) = touch.x;
             id(last_touch_y) = touch.y;

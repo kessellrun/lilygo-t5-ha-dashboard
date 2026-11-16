@@ -37,6 +37,7 @@ deep_sleep:
     mode:
       input: true
       pullup: true
+  wakeup_pin_mode: INVERT_WAKEUP
 
 # ==============================================================================
 # RTC-Backed Globals (Persisted across Deep Sleep Wake Cycles)
@@ -122,6 +123,24 @@ globals:
     restore_value: true
     initial_value: '3.95'
 
+  # Latched charging heuristic state updated on each ADC filter output
+  - id: is_charging_state
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  # True when current wake session originated from 15m timer without user touch
+  - id: is_timer_wake
+    type: bool
+    restore_value: false
+    initial_value: 'true'
+
+  # Tracks whether the E-Paper display has already been refreshed this session
+  - id: session_refreshed
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
 # ==============================================================================
 # 1S LiPo Voltage ADC (GPIO14) & 11-Point Non-Linear Discharge Curve Lookup
 # ==============================================================================
@@ -135,15 +154,22 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     attenuation: 12db
-    update_interval: 30s
+    update_interval: 10s
     filters:
       - multiply: 2.0
       - sliding_window_moving_average:
-          window_size: 8
-          send_every: 2
+          window_size: 4
+          send_every: 1
           send_first_at: 1
     on_value:
       then:
+        - lambda: |-
+            float v = x;
+            if (!isnan(v) && v > 2.0f) {
+              float dv = v - id(prev_lipo_voltage);
+              id(is_charging_state) = (v > 4.21f) || (dv >= 0.025f && v > 3.85f);
+              id(prev_lipo_voltage) = v;
+            }
         - component.update: lipo_battery_level
         - script.execute: evaluate_power_state
 
@@ -196,12 +222,15 @@ binary_sensor:
     name: "LiPo Battery Charging"
     device_class: battery_charging
     lambda: |-
-      float v = id(lipo_voltage).state;
-      if (isnan(v)) return false;
-      float dv = v - id(prev_lipo_voltage);
-      bool charging = (v > 4.22f) || (dv >= 0.015f);
-      id(prev_lipo_voltage) = v;
-      return charging;
+      return id(is_charging_state);
+
+# ==============================================================================
+# Periodic Power State Evaluation Interval (5s)
+# ==============================================================================
+interval:
+  - interval: 5s
+    then:
+      - script.execute: evaluate_power_state
 
 # ==============================================================================
 # Power Management & E-Paper Refresh Scripts
@@ -213,6 +242,7 @@ script:
       - delay: 300ms
       - lambda: |-
           id(refresh_counter) += 1;
+          id(session_refreshed) = true;
       - component.update: epaper_display
 
   - id: trigger_full_clean_refresh
@@ -221,6 +251,7 @@ script:
       - logger.log: "Triggering full black-white-clear anti-ghosting E-Paper cycle"
       - lambda: |-
           id(refresh_counter) = 0;
+          id(session_refreshed) = true;
       - component.update: epaper_display
 
   - id: enter_touch_armed_deep_sleep
@@ -232,9 +263,13 @@ script:
           then:
             - logger.log: "Stay-Awake OTA lock is ON in Home Assistant — skipping Deep Sleep"
           else:
-            - logger.log: "Rendering sleep status badge and entering Touch-Armed Deep Sleep (GPIO16 EXT0)"
-            - component.update: epaper_display
-            - delay: 600ms
+            - logger.log: "Entering Touch-Armed Deep Sleep (GPIO16 EXT0 / GPIO21 Wake + 15m Timer)"
+            - if:
+                condition:
+                  lambda: 'return !id(session_refreshed);'
+                then:
+                  - component.update: epaper_display
+            - delay: 1000ms
             - deep_sleep.enter:
                 id: deep_sleep_ctrl
                 sleep_duration: 15min
@@ -247,7 +282,6 @@ script:
           float soc  = id(lipo_battery_level).state;
           float v_crit = atof("${vbat_critical}");
           float soc_thresh = atof("${hybrid_sleep_soc_threshold}");
-          uint32_t idle_limit_ms = (uint32_t)(atoi("${inactivity_timeout_sec}")) * 1000UL;
 
           // 1. Critical Low-Battery Hardware Protection (< 3.32V)
           // Renders the Critical Hibernate lock screen and sleeps indefinitely
@@ -265,18 +299,30 @@ script:
             return;
           }
 
-          // 3. Respect User Touch Activity Window (stay awake for 90s after any tap)
-          uint32_t elapsed_ms = millis() - id(last_touch_ms);
-          if (elapsed_ms < idle_limit_ms) {
-            return;
-          }
-
-          // 4. Mode 0: Always Online (Wi-Fi Modem Sleep) — Never enter Deep Sleep
+          // 3. Mode 0: Always Online (Wi-Fi Modem Sleep) — Never enter Deep Sleep
           if (id(power_mode_index) == 0) {
             return;
           }
 
-          // 5. Mode 2: Max Battery — Enter Touch-Armed Deep Sleep as soon as idle
+          // 4. Respect Awake Window:
+          //    - Untouched 15m timer wake: brief sync window (${timer_wake_sync_sec} = 12s)
+          //    - Interactive touch/button wake: 30s in Max Battery (Mode 2), 90s in Adaptive Hybrid (Mode 1)
+          if (id(is_timer_wake)) {
+            uint32_t sync_limit_ms = (uint32_t)(atoi("${timer_wake_sync_sec}")) * 1000UL;
+            if (millis() < sync_limit_ms) {
+              return;
+            }
+          } else {
+            uint32_t idle_limit_ms = (id(power_mode_index) == 2)
+                ? (uint32_t)(atoi("${max_battery_touch_timeout_sec}")) * 1000UL
+                : (uint32_t)(atoi("${inactivity_timeout_sec}")) * 1000UL;
+            uint32_t elapsed_ms = millis() - id(last_touch_ms);
+            if (elapsed_ms < idle_limit_ms) {
+              return;
+            }
+          }
+
+          // 5. Mode 2: Max Battery — Enter Touch-Armed Deep Sleep as soon as idle/sync completes
           if (id(power_mode_index) == 2) {
             id(enter_touch_armed_deep_sleep).execute();
             return;
@@ -287,8 +333,12 @@ script:
           auto now = id(rtc_time).now();
           if (now.is_valid()) {
             int hr = now.hour;
-            int q_start = atoi("${quiet_start_hour}");
-            int q_end   = atoi("${quiet_end_hour}");
+            int q_start = !isnan(id(ha_quiet_start).state)
+                ? (int)id(ha_quiet_start).state
+                : atoi("${quiet_start_hour}");
+            int q_end = !isnan(id(ha_quiet_end).state)
+                ? (int)id(ha_quiet_end).state
+                : atoi("${quiet_end_hour}");
             if (q_start > q_end) {
               in_quiet_hours = (hr >= q_start || hr < q_end);
             } else {

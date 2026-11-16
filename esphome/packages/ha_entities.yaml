@@ -181,6 +181,9 @@ text_sensor:
     on_value:
       then:
         - lambda: |-
+            if (x.empty() || x == "unknown" || x == "unavailable") {
+              return;
+            }
             if (x.find("Always") != std::string::npos) {
               id(power_mode_index) = 0;
             } else if (x.find("Max") != std::string::npos || x.find("Deep") != std::string::npos) {
@@ -189,6 +192,7 @@ text_sensor:
               id(power_mode_index) = 1;
             }
         - script.execute: request_screen_refresh
+        - script.execute: evaluate_power_state
 
   # Diagnostic Wake Reason reported to Home Assistant and rendered on Tab 3
   - platform: template
@@ -291,7 +295,15 @@ sensor:
             then:
               - script.execute: request_screen_refresh
 
-  # --- Tab 3: On-Device Diagnostics ---
+  # --- Tab 3: Companion Power Management Helpers & On-Device Diagnostics ---
+  - platform: homeassistant
+    id: ha_quiet_start
+    entity_id: ${entity_quiet_start}
+
+  - platform: homeassistant
+    id: ha_quiet_end
+    entity_id: ${entity_quiet_end}
+
   - platform: wifi_signal
     id: wifi_rssi
     name: "Wi-Fi Signal RSSI"

@@ -40,11 +40,13 @@ input_select:
   lilygo_t5_power_profile:
     name: "LilyGo T5 LiPo Power Profile"
     icon: mdi:battery-sync
+    # Default/recommended: "Adaptive Hybrid (Recommended)"
+    # Note: `initial:` is intentionally omitted so Home Assistant preserves
+    # your selected power profile across restarts and YAML reloads.
     options:
       - "Adaptive Hybrid (Recommended)"
       - "Always Online (Modem Sleep)"
       - "Max Battery (Deep Sleep + Touch Wake)"
-    initial: "Adaptive Hybrid (Recommended)"
 
 input_number:
   lilygo_t5_quiet_hours_start:
@@ -53,7 +55,7 @@ input_number:
     min: 0
     max: 23
     step: 1
-    initial: 23
+    # Default: 23 (23:00 / 11:00 PM) — `initial:` omitted to persist user changes across restarts
     mode: box
     unit_of_measurement: "h"
 
@@ -63,7 +65,7 @@ input_number:
     min: 0
     max: 23
     step: 1
-    initial: 6
+    # Default: 6 (06:00 / 6:00 AM) — `initial:` omitted to persist user changes across restarts
     mode: box
     unit_of_measurement: "h"
 
@@ -136,7 +138,7 @@ automation:
           minutes: 5
     condition:
       - condition: state
-        entity_id: binary_sensor.lilygo_t5_h716_dashboard_lipo_charging_status
+        entity_id: binary_sensor.lilygo_t5_h716_dashboard_lipo_battery_charging
         state: "off"
     action:
       - action: persistent_notification.create

@@ -17,6 +17,8 @@ substitutions:
   vbat_critical: "3.32"
   hybrid_sleep_soc_threshold: "35"
   inactivity_timeout_sec: "90"
+  timer_wake_sync_sec: "12"
+  max_battery_touch_timeout_sec: "30"
   quiet_start_hour: "23"
   quiet_end_hour: "6"
 
@@ -43,6 +45,8 @@ substitutions:
 
   entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
   entity_power_profile: "input_select.lilygo_t5_power_profile"
+  entity_quiet_start: "input_number.lilygo_t5_quiet_hours_start"
+  entity_quiet_end: "input_number.lilygo_t5_quiet_hours_end"
 
   # ----------------------------------------------------------------------------
   # Tab 1: Weather & 5-Day Forecast
@@ -84,12 +88,18 @@ esphome:
           auto cause = esp_sleep_get_wakeup_cause();
           if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
             id(wake_reason_text).publish_state("GPIO21 Wake Button");
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
           } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
             id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
+            id(is_timer_wake) = true;
+            id(last_touch_ms) = 0;
           } else {
             id(wake_reason_text).publish_state("Cold Boot / USB Reset");
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
           }
-          id(last_touch_ms) = millis();
+          id(lipo_voltage).update();
       - delay: 2s
       - script.execute: request_screen_refresh
 
