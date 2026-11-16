@@ -107,6 +107,18 @@ binary_sensor:
             id(is_timer_wake) = false;
             id(last_touch_ms) = millis();
             id(power_mode_index) = (id(power_mode_index) + 1) % 3;
+            if (id(power_mode_index) == 2) {
+              id(is_cold_boot) = false;
+            }
+        - if:
+            condition:
+              lambda: 'return id(power_mode_index) == 2;'
+            then:
+              - deep_sleep.allow: deep_sleep_ctrl
+              - homeassistant.service:
+                  service: input_boolean.turn_off
+                  data:
+                    entity_id: ${entity_stay_awake_ota}
         - homeassistant.service:
             service: input_select.select_option
             data:
@@ -424,7 +436,14 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 3;'
             then:
-              - lambda: 'id(power_mode_index) = 2;'
+              - lambda: |-
+                  id(power_mode_index) = 2;
+                  id(is_cold_boot) = false;
+              - deep_sleep.allow: deep_sleep_ctrl
+              - homeassistant.service:
+                  service: input_boolean.turn_off
+                  data:
+                    entity_id: ${entity_stay_awake_ota}
               - homeassistant.service:
                   service: input_select.select_option
                   data:
@@ -469,4 +488,10 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 3;'
             then:
+              - lambda: 'id(is_cold_boot) = false;'
+              - deep_sleep.allow: deep_sleep_ctrl
+              - homeassistant.service:
+                  service: input_boolean.turn_off
+                  data:
+                    entity_id: ${entity_stay_awake_ota}
               - script.execute: enter_touch_armed_deep_sleep

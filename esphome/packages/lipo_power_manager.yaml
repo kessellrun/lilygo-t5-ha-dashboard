@@ -297,13 +297,22 @@ script:
           then:
             - logger.log: "OTA active or Stay-Awake lock is ON — skipping Deep Sleep"
           else:
-            - logger.log: "Entering Touch-Armed Deep Sleep (GPIO16 EXT0 / GPIO21 Wake + 15m Timer)"
+            - logger.log: "Entering Touch-Armed Deep Sleep (GPIO21 Wake + 15m Timer)"
             - if:
                 condition:
                   lambda: 'return !id(session_refreshed);'
                 then:
                   - component.update: epaper_display
             - delay: 1000ms
+            - lambda: |-
+                gpio_set_direction(GPIO_NUM_21, GPIO_MODE_INPUT);
+                gpio_set_pull_mode(GPIO_NUM_21, GPIO_PULLUP_ONLY);
+                if (gpio_get_level(GPIO_NUM_21) == 0) {
+                  ESP_LOGW("power", "GPIO21 is LOW at sleep entry — entering 15m timer-only Deep Sleep to avoid wake loop");
+                  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_EXT0);
+                  esp_sleep_enable_timer_wakeup(900ULL * 1000000ULL);
+                  esp_deep_sleep_start();
+                }
             - deep_sleep.enter:
                 id: deep_sleep_ctrl
                 sleep_duration: 15min

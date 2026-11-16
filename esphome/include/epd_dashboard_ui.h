@@ -674,7 +674,7 @@ inline void render_tab_power(esphome::display::Display &it) {
   int q_end      = !isnan(id(ha_quiet_end).state)   ? (int)id(ha_quiet_end).state   : 6;
 
   it.printf(668, 250, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "State: %s", chg ? "USB-C CHARGING" : "1S LIPO DISCHARGING");
+            "State: %s", chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA LOCKED (HA)" : "1S LIPO DISCHARGING"));
   it.printf(668, 274, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
             "Wake: %s", wake.c_str());
   it.printf(668, 298, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
