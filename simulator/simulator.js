@@ -34,9 +34,9 @@
   ];
 
   const POWER_MODES = [
-    { id: 0, label: "ALWAYS ONLINE", haName: "Always Online (Modem Sleep)", estHoursAt100: 22 },
-    { id: 1, label: "ADAPTIVE HYBRID", haName: "Adaptive Hybrid (Recommended)", estHoursAt100: 144 },
-    { id: 2, label: "MAX BATTERY", haName: "Max Battery (Deep Sleep + Touch Wake)", estHoursAt100: 720 }
+    { id: 0, label: "ALWAYS ONLINE", haName: "Always Online (Modem Sleep)", estHoursAt100: 120 },
+    { id: 1, label: "ADAPTIVE HYBRID", haName: "Adaptive Hybrid (Recommended)", estHoursAt100: 720 },
+    { id: 2, label: "MAX BATTERY", haName: "Max Battery (Deep Sleep + Touch Wake)", estHoursAt100: 2880 }
   ];
 
   const WEATHER_PRESETS = [
@@ -124,36 +124,39 @@
     wakeCause: "GPIO16 Touch Interrupt",
     wifiRssi: -58,
     uptimeSeconds: 1842,
+    quietStartHour: 23,
+    quietEndHour: 6,
     weatherIndex: 0,
     cursor: { x: null, y: null },
+    lastTouch: null,
     hoveredHitbox: null,
     lastStatusMessage: "HA Connected • All entities synced",
     sceneFlashUntil: 0,
     flashOverlay: null, // { mode: 'full'|'partial', region, phase }
 
     controls: [
-      { id: "ctrl_1", name: "Living Room Lights", entity: "light.living_room_lights", kind: "light", active: true, detail: "80% Warm White" },
-      { id: "ctrl_2", name: "Kitchen Pendant", entity: "light.kitchen_pendant", kind: "pendant", active: false, detail: "Off" },
-      { id: "ctrl_3", name: "Office Desk Switch", entity: "switch.office_desk", kind: "plug", active: true, detail: "42W Active" },
-      { id: "ctrl_4", name: "Front Door Lock", entity: "lock.front_door", kind: "lock", active: true, detail: "Locked • Deadbolt" },
-      { id: "ctrl_5", name: "Garage Door Cover", entity: "cover.garage_door", kind: "garage", active: false, detail: "Closed" },
-      { id: "ctrl_6", name: "Goodnight Scene", entity: "scene.goodnight", kind: "scene", active: false, detail: "Lights Off + Lock" }
+      { id: "ctrl_1", name: "Living Room TV", entity: "scene.living_room_tv", subtitle: "Home Assistant Scene", kind: "tv", active: true, onLabel: "ACTIVE", offLabel: "TAP TO RUN" },
+      { id: "ctrl_2", name: "Kitchen Lights", entity: "light.kitchen_lights", subtitle: "Smart Light Group", kind: "light_group", active: false, onLabel: "ON", offLabel: "OFF" },
+      { id: "ctrl_3", name: "Evening Lights", entity: "scene.evening_lights", subtitle: "Home Assistant Scene", kind: "light", active: false, onLabel: "ACTIVE", offLabel: "TAP TO RUN" },
+      { id: "ctrl_4", name: "Bookshelf Lights", entity: "light.cync_indoor_light_strip_16ft_2", subtitle: "Indoor Light Strip", kind: "light", active: false, onLabel: "ON", offLabel: "OFF" },
+      { id: "ctrl_5", name: "Wave Light", entity: "switch.living_room_light", subtitle: "Smart Switch Control", kind: "switch", active: true, onLabel: "ON", offLabel: "OFF" },
+      { id: "ctrl_6", name: "Goodnight", entity: "scene.bed_time", subtitle: "Whole-Home Scene", kind: "scene", active: false, onLabel: "ACTIVE", offLabel: "TAP TO RUN" }
     ],
 
     rooms: [
-      { name: "Living Room", tempF: 71.4, hum: 46 },
-      { name: "Primary Bedroom", tempF: 68.2, hum: 48 },
-      { name: "Home Office", tempF: 73.6, hum: 44 },
-      { name: "Kitchen / Nursery", tempF: 70.1, hum: 51 }
+      { name: "Living Room", tempF: 71.4, hum: 44, isEspresso: false },
+      { name: "Hallway", tempF: 68.8, hum: 48, isEspresso: false },
+      { name: "Home Office", tempF: 73.1, hum: 41, isEspresso: false },
+      { name: "DE1+ Grouphead", tempF: 198.5, hum: 0, isEspresso: true }
     ],
 
     hvac: {
-      modes: ["HEAT", "COOL", "AUTO", "OFF"],
-      modeIndex: 2,
+      modes: ["cool", "heat", "auto", "off"],
+      modeIndex: 0,
       currentTempF: 71,
       targetTempF: 70,
       co2Ppm: 540,
-      aqi: 24
+      aqi: 18
     }
   };
 
@@ -309,10 +312,10 @@
   function getActiveHitboxes() {
     const boxes = [
       // Header Quick Buttons (y: 8..48)
-      { id: "hdr_refresh", label: "REFRESH", x1: 740, y1: 8, x2: 845, y2: 48, action: () => triggerFullCleanRefresh("Manual [REFRESH]") },
+      { id: "hdr_refresh", label: "CLEAN", x1: 740, y1: 8, x2: 845, y2: 48, action: () => triggerFullCleanRefresh("Header [CLEAN]") },
       {
         id: "hdr_sleep_mode",
-        label: "SLEEP / MODE",
+        label: "MODE",
         x1: 846,
         y1: 8,
         x2: 950,
@@ -330,7 +333,7 @@
       { id: "tab_0_controls", label: "TAB 0: CONTROLS", x1: 0, y1: 476, x2: 239, y2: 540, action: () => switchTab(0) },
       { id: "tab_1_weather", label: "TAB 1: WEATHER", x1: 240, y1: 476, x2: 479, y2: 540, action: () => switchTab(1) },
       { id: "tab_2_climate", label: "TAB 2: CLIMATE", x1: 480, y1: 476, x2: 719, y2: 540, action: () => switchTab(2) },
-      { id: "tab_3_power", label: "TAB 3: LIPO & POWER", x1: 720, y1: 476, x2: 959, y2: 540, action: () => switchTab(3) }
+      { id: "tab_3_power", label: "TAB 3: POWER", x1: 720, y1: 476, x2: 959, y2: 540, action: () => switchTab(3) }
     ];
 
     if (state.isCriticalHibernate || state.isSleeping) {
@@ -376,10 +379,10 @@
         {
           id: "hvac_mode_pill",
           label: "HVAC MODE",
-          x1: 625,
-          y1: 92,
-          x2: 915,
-          y2: 132,
+          x1: 620,
+          y1: 116,
+          x2: 920,
+          y2: 148,
           action: () => cycleHvacMode()
         },
         {
@@ -402,40 +405,52 @@
         }
       );
     } else if (state.activeTab === 3) {
-      // Grid Row 2 mapped to Power Modes + Sleep Now
+      // Top Row Compact Power Mode Buttons (y: 66..142) + Bottom-Right Compact Action Buttons (y: 402..464)
       boxes.push(
         {
           id: "pwr_mode_0",
-          label: "ALWAYS ONLINE",
+          label: "1. ALWAYS ONLINE",
           x1: 20,
-          y1: 265,
+          y1: 66,
           x2: 310,
-          y2: 435,
-          action: () => setPowerMode(0, { x: 20, y: 265, w: 290, h: 170 })
+          y2: 142,
+          action: () => setPowerMode(0, { x: 20, y: 66, w: 290, h: 76 })
         },
         {
           id: "pwr_mode_1",
-          label: "ADAPTIVE HYBRID",
+          label: "2. ADAPTIVE HYBRID",
           x1: 335,
-          y1: 265,
+          y1: 66,
           x2: 625,
-          y2: 435,
-          action: () => setPowerMode(1, { x: 335, y: 265, w: 290, h: 170 })
+          y2: 142,
+          action: () => setPowerMode(1, { x: 335, y: 66, w: 290, h: 76 })
         },
         {
-          id: "pwr_mode_2_sleep",
-          label: "MAX BATTERY / SLEEP",
+          id: "pwr_mode_2",
+          label: "3. MAX BATTERY",
           x1: 650,
-          y1: 265,
+          y1: 66,
           x2: 940,
-          y2: 435,
-          action: () => {
-            if (state.powerModeIndex === 2) {
-              enterDeepSleep("Tab 3 [SLEEP NOW] button");
-            } else {
-              setPowerMode(2, { x: 650, y: 265, w: 290, h: 170 });
-            }
-          }
+          y2: 142,
+          action: () => setPowerMode(2, { x: 650, y: 66, w: 290, h: 76 })
+        },
+        {
+          id: "pwr_clean",
+          label: "[ CLEAN ]",
+          x1: 650,
+          y1: 402,
+          x2: 788,
+          y2: 464,
+          action: () => triggerFullCleanRefresh("Tab 3 [CLEAN]")
+        },
+        {
+          id: "pwr_sleep",
+          label: "[ SLEEP ]",
+          x1: 802,
+          y1: 402,
+          x2: 940,
+          y2: 464,
+          action: () => enterDeepSleep("Tab 3 [SLEEP]")
         }
       );
     }
@@ -502,7 +517,7 @@
   function switchTab(tabIndex) {
     if (state.activeTab === tabIndex) return;
     state.activeTab = tabIndex;
-    const tabNames = ["CONTROLS", "WEATHER", "CLIMATE", "LIPO & POWER"];
+    const tabNames = ["CONTROLS", "WEATHER", "CLIMATE", "POWER"];
     state.lastStatusMessage = `Switched to Tab ${tabIndex}: ${tabNames[tabIndex]}`;
     logEvent("epd", "UI", `global active_tab = ${tabIndex} (${tabNames[tabIndex]})`);
     triggerPartialRefresh({ x: 0, y: 57, w: WIDTH, h: 483 }, `Tab -> ${tabNames[tabIndex]}`);
@@ -510,52 +525,27 @@
 
   function toggleControlCard(idx, x, y, w, h) {
     const ctrl = state.controls[idx];
-    if (ctrl.kind === "scene") {
-      ctrl.active = true;
-      state.sceneFlashUntil = Date.now() + 2500;
-      state.controls[0].active = false;
-      state.controls[0].detail = "Off";
-      state.controls[1].active = false;
-      state.controls[1].detail = "Off";
-      state.controls[2].active = false;
-      state.controls[2].detail = "Standby";
-      state.controls[3].active = true;
-      state.controls[3].detail = "Locked • Deadbolt";
-      state.lastStatusMessage = "Activated scene.goodnight";
-      logEvent("ha", "ESPHOME -> HA", `homeassistant.service: scene.turn_on { entity_id: "${ctrl.entity}" }`);
-      logEvent("ha", "HA -> ESPHOME", `Goodnight applied: lights OFF, desk OFF, front door LOCKED`);
-      triggerPartialRefresh({ x: 20, y: 75, w: 920, h: 365 }, "scene.goodnight");
-      setTimeout(() => {
-        ctrl.active = false;
-        renderAll();
-      }, 2500);
+    if (idx === 0 || idx === 2 || idx === 5) {
+      // Mutually exclusive scenes matching touch_navigation.yaml (ctrl_1, ctrl_3, ctrl_6)
+      state.controls[0].active = idx === 0;
+      state.controls[2].active = idx === 2;
+      state.controls[5].active = idx === 5;
+      if (idx === 5) {
+        state.controls[1].active = false;
+        state.controls[3].active = false;
+        state.controls[4].active = false;
+      }
+      state.lastStatusMessage = `homeassistant.turn_on (${ctrl.entity}) -> ACTIVE`;
+      logEvent("ha", "ESPHOME -> HA", `homeassistant.service: homeassistant.turn_on { entity_id: "${ctrl.entity}" }`);
+      logEvent("ha", "HA -> ESPHOME", `state_changed: ${ctrl.entity} = ACTIVE`);
+      triggerPartialRefresh({ x: 20, y: 75, w: 920, h: 365 }, ctrl.entity);
       return;
     }
 
     ctrl.active = !ctrl.active;
-    let service = "homeassistant.toggle";
-    if (ctrl.kind === "light" || ctrl.kind === "pendant") {
-      service = "light.toggle";
-      ctrl.detail = ctrl.active ? (ctrl.kind === "light" ? "80% Warm White" : "100% Bright") : "Off";
-    } else if (ctrl.kind === "plug") {
-      service = "switch.toggle";
-      ctrl.detail = ctrl.active ? "42W Active" : "Standby";
-    } else if (ctrl.kind === "lock") {
-      service = ctrl.active ? "lock.lock" : "lock.unlock";
-      ctrl.detail = ctrl.active ? "Locked • Deadbolt" : "Unlocked!";
-    } else if (ctrl.kind === "garage") {
-      service = ctrl.active ? "cover.open_cover" : "cover.close_cover";
-      ctrl.detail = ctrl.active ? "OPEN" : "Closed";
-    }
-
-    const stateLabel = ctrl.kind === "lock"
-      ? (ctrl.active ? "LOCKED" : "UNLOCKED")
-      : ctrl.kind === "garage"
-        ? (ctrl.active ? "OPEN" : "CLOSED")
-        : (ctrl.active ? "ON" : "OFF");
-
-    state.lastStatusMessage = `${service} (${ctrl.entity}) -> ${stateLabel}`;
-    logEvent("ha", "ESPHOME -> HA", `homeassistant.service: ${service} { entity_id: "${ctrl.entity}" }`);
+    const stateLabel = ctrl.active ? ctrl.onLabel : ctrl.offLabel;
+    state.lastStatusMessage = `homeassistant.toggle (${ctrl.entity}) -> ${stateLabel}`;
+    logEvent("ha", "ESPHOME -> HA", `homeassistant.service: homeassistant.toggle { entity_id: "${ctrl.entity}" }`);
     logEvent("ha", "HA -> ESPHOME", `state_changed: ${ctrl.entity} = ${stateLabel}`);
     triggerPartialRefresh({ x, y, w, h }, ctrl.entity);
   }
@@ -646,6 +636,22 @@
   // ---------------------------------------------------------------------------
   // Canvas Drawing Primitives (Crisp 16-Level E-Paper Graphics)
   // ---------------------------------------------------------------------------
+  function drawCard(c, x, y, w, h, inverted = false, borderPx = 2) {
+    if (inverted) {
+      c.fillStyle = PALETTE.ink;
+      c.fillRect(x, y, w, h);
+    } else {
+      c.fillStyle = PALETTE.paper;
+      c.fillRect(x, y, w, h);
+      if (borderPx > 0) {
+        c.strokeStyle = PALETTE.ink;
+        c.lineWidth = borderPx;
+        const inset = borderPx / 2;
+        c.strokeRect(x + inset, y + inset, w - borderPx, h - borderPx);
+      }
+    }
+  }
+
   function roundRectPath(c, x, y, w, h, r) {
     const radius = Math.min(r, w / 2, h / 2);
     c.beginPath();
@@ -674,42 +680,163 @@
     }
   }
 
-  function drawWifiBars(c, x, y, rssi, color) {
-    const bars = rssi > -55 ? 4 : rssi > -68 ? 3 : rssi > -80 ? 2 : 1;
-    for (let i = 0; i < 4; i++) {
-      const bh = 5 + i * 4;
-      c.fillStyle = i < bars ? color : PALETTE.g12;
-      c.fillRect(x + i * 5, y + (17 - bh), 3.5, bh);
+  function drawWifiIcon(c, x, y, rssi, connected, color) {
+    c.save();
+    const cx = x + 11;
+    const cy = y + 18;
+    const active = connected && rssi > -95;
+    c.lineWidth = 2.2;
+    c.lineCap = "round";
+
+    [13, 9, 5].forEach((r, idx) => {
+      const threshold = idx === 0 ? -70 : idx === 1 ? -82 : -95;
+      c.strokeStyle = active && rssi > threshold ? color : PALETTE.g12;
+      c.beginPath();
+      c.arc(cx, cy, r, -Math.PI * 0.78, -Math.PI * 0.22);
+      c.stroke();
+    });
+
+    c.fillStyle = active ? color : PALETTE.g12;
+    c.beginPath();
+    c.arc(cx, cy, 2, 0, Math.PI * 2);
+    c.fill();
+
+    if (!active) {
+      c.strokeStyle = color;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(x + 2, y + 3);
+      c.lineTo(x + 20, y + 20);
+      c.stroke();
     }
+    c.restore();
   }
 
-  function drawBatteryIcon(c, x, y, soc, charging, color) {
+  function drawBatteryIcon(c, x, y, soc, charging, color, lowWarning = false) {
+    c.save();
+    // Vertical MDI-style battery icon (14w x 20h inside 22x22 box)
+    const bx = x + 4;
+    const by = y + 3;
+    const bw = 13;
+    const bh = 18;
+
+    // Terminal nub on top
+    c.fillStyle = color;
+    c.fillRect(bx + 3.5, by - 2.5, 6, 2.5);
+
     // Outer body
     c.strokeStyle = color;
-    c.lineWidth = 2;
-    c.strokeRect(x, y, 32, 16);
-    // Positive terminal nub
-    c.fillStyle = color;
-    c.fillRect(x + 32, y + 4, 3, 8);
-    // Fill level
-    const fillW = Math.max(0, Math.round((26 * soc) / 100));
-    if (fillW > 0) {
-      c.fillStyle = soc <= 15 ? PALETTE.g04 : color;
-      c.fillRect(x + 3, y + 3, fillW, 10);
+    c.lineWidth = 1.8;
+    c.strokeRect(bx, by, bw, bh);
+
+    // Inner fill proportional to SoC
+    const maxFillH = bh - 4;
+    const fillH = Math.max(0, Math.round((maxFillH * Math.max(0, Math.min(100, soc))) / 100));
+    if (fillH > 0) {
+      c.fillStyle = color;
+      c.fillRect(bx + 2, by + bh - 2 - fillH, bw - 4, fillH);
     }
-    // Charging bolt next to icon
+
+    // Charging bolt overlay
     if (charging) {
       c.beginPath();
-      c.moveTo(x - 8, y + 1);
-      c.lineTo(x - 14, y + 9);
-      c.lineTo(x - 9, y + 9);
-      c.lineTo(x - 11, y + 16);
-      c.lineTo(x - 4, y + 7);
-      c.lineTo(x - 9, y + 7);
+      c.moveTo(bx + 8, by + 3);
+      c.lineTo(bx + 3.5, by + 10);
+      c.lineTo(bx + 7, by + 10);
+      c.lineTo(bx + 5, by + 15);
+      c.lineTo(bx + 10, by + 8);
+      c.lineTo(bx + 6.5, by + 8);
       c.closePath();
-      c.fillStyle = color;
+      c.fillStyle = PALETTE.paper;
       c.fill();
+      c.strokeStyle = color;
+      c.lineWidth = 1;
+      c.stroke();
+    } else if (lowWarning) {
+      c.fillStyle = PALETTE.paper;
+      c.font = "700 11px 'Segoe UI', Roboto, sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText("!", bx + bw / 2, by + bh / 2);
     }
+    c.restore();
+  }
+
+  function drawRefreshIcon(c, x, y, color) {
+    c.save();
+    const cx = x + 10;
+    const cy = y + 11;
+    c.strokeStyle = color;
+    c.fillStyle = color;
+    c.lineWidth = 2.1;
+    c.lineCap = "round";
+    c.beginPath();
+    c.arc(cx, cy, 7.5, -Math.PI * 0.85, Math.PI * 0.65);
+    c.stroke();
+    // Arrowhead
+    const ax = cx + Math.cos(-Math.PI * 0.85) * 7.5;
+    const ay = cy + Math.sin(-Math.PI * 0.85) * 7.5;
+    c.beginPath();
+    c.moveTo(ax - 1, ay - 4);
+    c.lineTo(ax + 5, ay - 1);
+    c.lineTo(ax - 1, ay + 3);
+    c.closePath();
+    c.fill();
+    c.restore();
+  }
+
+  function drawMoonIcon(c, x, y, color) {
+    c.save();
+    const cx = x + 10;
+    const cy = y + 11;
+    c.fillStyle = color;
+    c.beginPath();
+    c.arc(cx - 1, cy, 8, Math.PI * 0.3, Math.PI * 1.75);
+    c.quadraticCurveTo(cx + 3, cy, cx - 1 + Math.cos(Math.PI * 0.3) * 8, cy + Math.sin(Math.PI * 0.3) * 8);
+    c.closePath();
+    c.fill();
+    c.restore();
+  }
+
+  function drawNavIcon(c, kind, x, y, color) {
+    c.save();
+    c.strokeStyle = color;
+    c.fillStyle = color;
+    c.lineWidth = 2;
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    const cx = x + 11;
+    const cy = y + 11;
+
+    if (kind === "controls") {
+      c.beginPath();
+      c.moveTo(cx - 9, cy);
+      c.lineTo(cx, cy - 8);
+      c.lineTo(cx + 9, cy);
+      c.lineTo(cx + 7, cy);
+      c.lineTo(cx + 7, cy + 8);
+      c.lineTo(cx - 7, cy + 8);
+      c.lineTo(cx - 7, cy);
+      c.closePath();
+      c.stroke();
+      c.fillRect(cx - 2.5, cy + 1, 5, 7);
+    } else if (kind === "weather") {
+      drawWeatherIcon(c, "partlycloudy", cx, cy + 1, 0.52, color);
+    } else if (kind === "climate") {
+      // Thermometer
+      c.beginPath();
+      c.arc(cx, cy + 5.5, 3.8, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.moveTo(cx - 2.2, cy + 3);
+      c.lineTo(cx - 2.2, cy - 7);
+      c.arc(cx, cy - 7, 2.2, Math.PI, 0);
+      c.lineTo(cx + 2.2, cy + 3);
+      c.stroke();
+    } else if (kind === "power") {
+      drawBatteryIcon(c, x, y, 80, false, color, false);
+    }
+    c.restore();
   }
 
   function drawControlIcon(c, kind, cx, cy, active, fg) {
@@ -720,93 +847,52 @@
     c.lineCap = "round";
     c.lineJoin = "round";
 
-    if (kind === "light") {
+    if (kind === "tv") {
+      c.strokeRect(cx - 14, cy - 11, 28, 19);
       c.beginPath();
-      c.arc(cx, cy - 4, 12, Math.PI * 0.78, Math.PI * 2.22);
-      c.lineTo(cx + 6, cy + 11);
-      c.lineTo(cx - 6, cy + 11);
+      c.moveTo(cx - 6, cy + 12);
+      c.lineTo(cx + 6, cy + 12);
+      c.moveTo(cx, cy + 8);
+      c.lineTo(cx, cy + 12);
+      c.stroke();
+      if (active) {
+        c.fillRect(cx - 10, cy - 7, 20, 11);
+      }
+    } else if (kind === "light_group" || kind === "light") {
+      c.beginPath();
+      c.arc(cx, cy - 3, 10, Math.PI * 0.78, Math.PI * 2.22);
+      c.lineTo(cx + 5, cy + 9);
+      c.lineTo(cx - 5, cy + 9);
       c.closePath();
       if (active) c.fill();
       c.stroke();
-      c.fillRect(cx - 5, cy + 13, 10, 4);
-      if (active) {
+      c.fillRect(cx - 4, cy + 11, 8, 3.5);
+      if (active || kind === "light_group") {
         for (let a = 0; a < 5; a++) {
           const ang = -Math.PI + (a * Math.PI) / 4;
           c.beginPath();
-          c.moveTo(cx + Math.cos(ang) * 16, cy - 4 + Math.sin(ang) * 16);
-          c.lineTo(cx + Math.cos(ang) * 20, cy - 4 + Math.sin(ang) * 20);
+          c.moveTo(cx + Math.cos(ang) * 14, cy - 3 + Math.sin(ang) * 14);
+          c.lineTo(cx + Math.cos(ang) * 17, cy - 3 + Math.sin(ang) * 17);
           c.stroke();
         }
       }
-    } else if (kind === "pendant") {
-      c.beginPath();
-      c.moveTo(cx, cy - 18);
-      c.lineTo(cx, cy - 8);
-      c.stroke();
-      c.beginPath();
-      c.moveTo(cx - 16, cy + 8);
-      c.quadraticCurveTo(cx, cy - 12, cx + 16, cy + 8);
-      c.closePath();
-      if (active) c.fill();
-      c.stroke();
-      c.beginPath();
-      c.arc(cx, cy + 11, 4, 0, Math.PI);
-      c.stroke();
-    } else if (kind === "plug") {
-      c.strokeRect(cx - 12, cy - 12, 24, 24);
-      c.beginPath();
-      c.moveTo(cx - 5, cy - 6);
-      c.lineTo(cx - 5, cy);
-      c.moveTo(cx + 5, cy - 6);
-      c.lineTo(cx + 5, cy);
-      c.stroke();
-      c.beginPath();
-      c.arc(cx, cy + 6, 2.5, 0, Math.PI * 2);
-      c.fill();
-    } else if (kind === "lock") {
-      c.beginPath();
+    } else if (kind === "switch") {
+      c.strokeRect(cx - 11, cy - 14, 22, 28);
+      c.strokeRect(cx - 5, cy - 8, 10, 16);
       if (active) {
-        c.arc(cx, cy - 6, 8, Math.PI, 0);
+        c.fillRect(cx - 5, cy - 8, 10, 8);
       } else {
-        c.arc(cx - 3, cy - 9, 8, Math.PI, 0);
-      }
-      c.stroke();
-      roundRectPath(c, cx - 12, cy - 3, 24, 19, 3);
-      if (active) c.fill();
-      c.stroke();
-    } else if (kind === "garage") {
-      c.beginPath();
-      c.moveTo(cx - 17, cy - 3);
-      c.lineTo(cx, cy - 16);
-      c.lineTo(cx + 17, cy - 3);
-      c.lineTo(cx + 17, cy + 15);
-      c.lineTo(cx - 17, cy + 15);
-      c.closePath();
-      c.stroke();
-      if (!active) {
-        // Closed horizontal slats
-        for (let row = 0; row < 3; row++) {
-          c.fillRect(cx - 10, cy + 1 + row * 5, 20, 2.5);
-        }
-      } else {
-        // Open arrow
-        c.beginPath();
-        c.moveTo(cx, cy + 12);
-        c.lineTo(cx, cy);
-        c.moveTo(cx - 5, cy + 5);
-        c.lineTo(cx, cy);
-        c.lineTo(cx + 5, cy + 5);
-        c.stroke();
+        c.fillRect(cx - 5, cy, 10, 8);
       }
     } else if (kind === "scene") {
       // Crescent moon + star
       c.beginPath();
-      c.arc(cx - 2, cy, 13, Math.PI * 0.3, Math.PI * 1.75);
-      c.quadraticCurveTo(cx + 4, cy, cx - 2 + Math.cos(Math.PI * 0.3) * 13, cy + Math.sin(Math.PI * 0.3) * 13);
+      c.arc(cx - 2, cy, 12, Math.PI * 0.3, Math.PI * 1.75);
+      c.quadraticCurveTo(cx + 4, cy, cx - 2 + Math.cos(Math.PI * 0.3) * 12, cy + Math.sin(Math.PI * 0.3) * 12);
       c.closePath();
       c.fill();
       c.beginPath();
-      c.arc(cx + 12, cy - 10, 2.5, 0, Math.PI * 2);
+      c.arc(cx + 11, cy - 9, 2.3, 0, Math.PI * 2);
       c.fill();
     }
     c.restore();
@@ -894,237 +980,210 @@
   // Main 960x540 Frame Renderers
   // ---------------------------------------------------------------------------
   function renderHeader() {
-    // Background bar (y: 0..56)
+    // Background bar (y: 0..56) with 2px bottom border matching epd_dashboard_ui.h
     ctx.fillStyle = PALETTE.paper;
     ctx.fillRect(0, 0, WIDTH, 56);
-    ctx.strokeStyle = PALETTE.ink;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 56);
-    ctx.lineTo(WIDTH, 56);
-    ctx.stroke();
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(0, 54, WIDTH, 2);
 
-    // Left (x: 16..310): Time & Date
+    // Left (x: 16..310): Time on top line (y: 8..30), Date on second line (y: 35..50)
     const now = new Date();
     const timeStr = formatClock(now);
     const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 22px 'Segoe UI', Roboto, sans-serif";
-    ctx.textBaseline = "middle";
+    ctx.textBaseline = "top";
     ctx.textAlign = "left";
-    ctx.fillText(timeStr, 16, 28);
-    const timeW = ctx.measureText(timeStr).width;
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "500 15px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(`•  ${dateStr}`, 24 + timeW, 29);
+    ctx.font = "700 24px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(timeStr, 16, 8);
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(dateStr, 16, 35);
 
-    // Center (x: 315..555): Wi-Fi RSSI bars + Active Power Mode pill
-    drawWifiBars(ctx, 322, 19, state.wifiRssi, state.isSleeping ? PALETTE.g10 : PALETTE.ink);
+    // Center (x: 318..545): Wi-Fi icon + sharp-bordered mode card (350, 12, 195, 32)
+    drawWifiIcon(ctx, 318, 16, state.wifiRssi, !state.isSleeping, PALETTE.ink);
     const modeLabel = POWER_MODES[state.powerModeIndex].label;
-    fillRoundRect(ctx, 352, 12, 196, 32, 16, PALETTE.g14, PALETTE.ink, 1.5);
+    drawCard(ctx, 350, 12, 195, 32, false, 1);
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 12.5px 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(modeLabel, 450, 28);
+    ctx.textBaseline = "top";
+    ctx.fillText(modeLabel, 447, 19);
 
-    // Right Battery Gauge (x: 560..735): 1S LiPo icon + SoC% + Voltage
+    // Right Battery Gauge (x: 560..735): Battery icon + "84% • 4.01V" + status subtitle
     const soc = computeLipoSoc(state.lipoVoltage);
     const charging = isChargingActive();
-    drawBatteryIcon(ctx, 578, 20, soc, charging, PALETTE.ink);
+    drawBatteryIcon(ctx, 560, 15, soc, charging, PALETTE.ink, state.lipoVoltage < 3.45);
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 15px 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`${soc}% • ${state.lipoVoltage.toFixed(2)}V`, 620, 29);
+    ctx.textBaseline = "top";
+    ctx.fillText(`${soc}% • ${state.lipoVoltage.toFixed(2)}V`, 588, 11);
+
+    const batStatus = charging
+      ? "USB-C CHARGING"
+      : (state.powerModeIndex === 0 || state.stayAwakeOta)
+        ? "OTA / ALWAYS ON"
+        : "1S LIPO ACTIVE";
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(batStatus, 588, 33);
 
     // Header Quick Buttons (y: 8..48)
-    // [REFRESH] x: 740..845, y: 8..48
-    fillRoundRect(ctx, 740, 8, 105, 40, 8, PALETTE.paper, PALETTE.ink, 2);
+    // [CLEAN] x: 740..845, y: 8..48
+    drawCard(ctx, 740, 8, 105, 40, false, 2);
+    drawRefreshIcon(ctx, 752, 17, PALETTE.ink);
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("REFRESH", 792.5, 28);
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("CLEAN", 780, 20);
 
-    // [SLEEP / MODE] x: 846..950, y: 8..48
-    fillRoundRect(ctx, 848, 8, 102, 40, 8, PALETTE.ink, PALETTE.ink, 2);
-    ctx.fillStyle = PALETTE.paper;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(state.isSleeping ? "SLEEPING" : "MODE", 899, 28);
+    // [MODE] x: 846..950, y: 8..48
+    drawCard(ctx, 846, 8, 104, 40, false, 2);
+    drawMoonIcon(ctx, 856, 17, PALETTE.ink);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(state.isSleeping ? "SLEEP" : "MODE", 884, 20);
   }
 
   function renderBottomTabs() {
     // Bottom Bar y: 476..540
     ctx.fillStyle = PALETTE.paper;
     ctx.fillRect(0, 476, WIDTH, 64);
-    ctx.strokeStyle = PALETTE.ink;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 476);
-    ctx.lineTo(WIDTH, 476);
-    ctx.stroke();
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(0, 476, WIDTH, 2);
 
     const tabs = [
-      { label: "CONTROLS", x1: 0, x2: 239 },
-      { label: "WEATHER", x1: 240, x2: 479 },
-      { label: "CLIMATE", x1: 480, x2: 719 },
-      { label: "LIPO & POWER", x1: 720, x2: 959 }
+      { kind: "controls", label: "CONTROLS", x: 0, w: 240 },
+      { kind: "weather", label: "WEATHER", x: 240, w: 240 },
+      { kind: "climate", label: "CLIMATE", x: 480, w: 240 },
+      { kind: "power", label: "POWER", x: 720, w: 240 }
     ];
 
     tabs.forEach((tab, idx) => {
-      const w = tab.x2 - tab.x1 + 1;
       const isSelected = state.activeTab === idx;
       if (isSelected) {
         ctx.fillStyle = PALETTE.ink;
-        ctx.fillRect(tab.x1, 476, w, 64);
-      } else if (idx > 0) {
-        ctx.strokeStyle = PALETTE.g12;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(tab.x1, 482);
-        ctx.lineTo(tab.x1, 534);
-        ctx.stroke();
+        ctx.fillRect(tab.x, 478, tab.w, 62);
+      } else {
+        ctx.fillStyle = PALETTE.paper;
+        ctx.fillRect(tab.x, 478, tab.w, 62);
+        if (idx > 0) {
+          ctx.fillStyle = PALETTE.ink;
+          ctx.fillRect(tab.x, 478, 1, 62);
+        }
       }
-      ctx.fillStyle = isSelected ? PALETTE.paper : PALETTE.ink;
-      ctx.font = "700 16px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(tab.label, tab.x1 + w / 2, 509);
+
+      const fg = isSelected ? PALETTE.paper : PALETTE.ink;
+      const cx = tab.x + tab.w / 2;
+      ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+      const iconW = 22;
+      const gap = 12;
+      const textW = ctx.measureText(tab.label).width;
+      const startX = Math.round(cx - (iconW + gap + textW) / 2);
+
+      drawNavIcon(ctx, tab.kind, startX, 497, fg);
+      ctx.fillStyle = fg;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(tab.label, startX + iconW + gap, 499);
     });
   }
 
   function renderTab0Controls() {
-    const cols = [
-      [20, 310],
-      [335, 625],
-      [650, 940]
-    ];
-    const rows = [
-      [75, 245],
-      [265, 435]
-    ];
+    const cols = [20, 335, 650];
+    const rows = [75, 265];
+    let activeCount = 0;
 
     state.controls.forEach((ctrl, idx) => {
-      const [x1, x2] = cols[idx % 3];
-      const [y1, y2] = rows[Math.floor(idx / 3)];
-      const w = x2 - x1;
-      const h = y2 - y1;
+      const x = cols[idx % 3];
+      const y = rows[Math.floor(idx / 3)];
+      const isOn = ctrl.active;
+      if (isOn) activeCount++;
 
-      const isEmphasized = ctrl.kind === "scene"
-        ? Date.now() < state.sceneFlashUntil
-        : ctrl.active;
+      drawCard(ctx, x, y, 290, 170, isOn, 2);
+      const fg = isOn ? PALETTE.paper : PALETTE.ink;
+      const stTxt = isOn ? ctrl.onLabel : ctrl.offLabel;
 
-      const cardBg = isEmphasized ? PALETTE.ink : PALETTE.paper;
-      const fg = isEmphasized ? PALETTE.paper : PALETTE.ink;
-      const subFg = isEmphasized ? PALETTE.g12 : PALETTE.g06;
+      drawControlIcon(ctx, ctrl.kind, x + 38, y + 38, isOn, fg);
 
-      fillRoundRect(ctx, x1, y1, w, h, 12, cardBg, PALETTE.ink, 2);
-
-      // Icon circle
-      fillRoundRect(ctx, x1 + 18, y1 + 18, 52, 52, 12, isEmphasized ? PALETTE.g02 : PALETTE.g14, fg, 1.5);
-      drawControlIcon(ctx, ctrl.kind, x1 + 44, y1 + 44, ctrl.active, fg);
-
-      // State Pill top-right
-      let stateText = ctrl.active ? "ON" : "OFF";
-      if (ctrl.kind === "lock") stateText = ctrl.active ? "LOCKED" : "UNLOCKED";
-      if (ctrl.kind === "garage") stateText = ctrl.active ? "OPEN" : "CLOSED";
-      if (ctrl.kind === "scene") stateText = Date.now() < state.sceneFlashUntil ? "ACTIVATED" : "TRIGGER";
-
-      fillRoundRect(ctx, x2 - 104, y1 + 22, 86, 26, 13, isEmphasized ? PALETTE.paper : PALETTE.g14, fg, 1.2);
-      ctx.fillStyle = isEmphasized ? PALETTE.ink : PALETTE.ink;
-      ctx.font = "700 11.5px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(stateText, x2 - 61, y1 + 35);
-
-      // Title & Entity detail
       ctx.fillStyle = fg;
-      ctx.font = "700 20px 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      ctx.fillText(stTxt, x + 268, y + 26);
+
+      ctx.font = "700 24px 'Segoe UI', Roboto, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText(ctrl.name, x1 + 18, y1 + 104);
+      ctx.fillText(ctrl.name, x + 22, y + 92);
 
-      ctx.fillStyle = subFg;
-      ctx.font = "500 13.5px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(ctrl.detail, x1 + 18, y1 + 132);
-
-      ctx.font = "500 11px Consolas, monospace";
-      ctx.fillText(ctrl.entity, x1 + 18, y1 + 154);
+      ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(ctrl.subtitle, x + 22, y + 128);
     });
 
     // Bottom Status Strip (y: 444..470)
-    fillRoundRect(ctx, 20, 444, 920, 24, 6, PALETTE.g14, PALETTE.g12, 1);
-    ctx.fillStyle = PALETTE.g04;
-    ctx.font = "600 12px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`STATUS: ${state.lastStatusMessage}`, 32, 456);
-    ctx.textAlign = "right";
-    ctx.fillText(
-      `Partial: ${state.partialRefreshCount}/${state.maxPartialBeforeClean}  •  OTA Lock: ${state.stayAwakeOta ? "AWAKE" : "AUTO"}`,
-      928,
-      456
-    );
+    ctx.textBaseline = "top";
+    const statusText = state.lastTouch
+      ? `GT911 Touch Ready (Last Tap: X=${state.lastTouch.x}, Y=${state.lastTouch.y})  •  ${activeCount} of 6 Entities Active  •  Tap any card to toggle`
+      : `GT911 Capacitive Touch Ready  •  ${activeCount} of 6 Entities Active  •  Tap any card to toggle via Home Assistant API`;
+    ctx.fillText(statusText, 24, 448);
   }
 
   function renderTab1Weather() {
     const w = WEATHER_PRESETS[state.weatherIndex];
 
     // Left Hero Card (x: 20..420, y: 75..455)
-    fillRoundRect(ctx, 20, 75, 400, 380, 14, PALETTE.paper, PALETTE.ink, 2);
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
+    drawCard(ctx, 20, 75, 400, 380, false, 2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("OUTDOOR WEATHER  •  CLICK TO CYCLE", 40, 100);
+    ctx.textBaseline = "top";
+    ctx.fillText("OUTDOOR CONDITIONS", 44, 92);
 
-    drawWeatherIcon(ctx, w.condition, 105, 185, 2.2, PALETTE.ink);
+    drawWeatherIcon(ctx, w.condition, 78, 156, 1.55, PALETTE.ink);
 
     // Large Temperature
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 72px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(formatTemp(w.tempF, 0), 175, 178);
-    ctx.font = "600 18px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillStyle = PALETTE.g04;
-    ctx.fillText(w.label, 178, 224);
+    ctx.font = "700 48px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(formatTemp(w.tempF, 0), 132, 125);
+    ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(w.label, 134, 182);
 
     // Divider
-    ctx.strokeStyle = PALETTE.g12;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(38, 260);
-    ctx.lineTo(402, 260);
-    ctx.stroke();
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(44, 224, 352, 1);
 
-    // 2x3 Metrics Grid
+    // Weather Detail Metrics inside Left Hero Card
     const metrics = [
-      ["FEELS LIKE", formatTemp(w.feelsF, 0)],
-      ["HUMIDITY", `${w.humidity}%`],
-      ["WIND", formatSpeed(w.windMph)],
-      ["UV INDEX", `${w.uv} (${w.uv >= 6 ? "High" : w.uv >= 3 ? "Mod" : "Low"})`],
-      ["PRESSURE", formatPressure(w.pressureHpa)],
-      ["SUNRISE / SET", `${formatClockSimple(w.sunrise)} / ${formatClockSimple(w.sunset)}`]
+      ["FEELS LIKE", formatTemp(w.feelsF, 0), 44, 242, 24],
+      ["HUMIDITY", `${w.humidity}%`, 230, 242, 24],
+      ["WIND SPEED", formatSpeed(w.windMph), 44, 315, 24],
+      ["UV INDEX", `${w.uv}`, 230, 315, 24],
+      ["BAROMETRIC PRESSURE", `${w.pressureHpa} hPa`, 44, 388, 18]
     ];
 
-    metrics.forEach(([label, val], idx) => {
-      const col = idx % 2;
-      const row = Math.floor(idx / 2);
-      const mx = 42 + col * 185;
-      const my = 286 + row * 56;
-      ctx.fillStyle = PALETTE.g06;
-      ctx.font = "700 11px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(label, mx, my);
+    metrics.forEach(([label, val, mx, my, valSize]) => {
       ctx.fillStyle = PALETTE.ink;
-      ctx.font = "700 17px 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(label, mx, my);
+      ctx.font = `700 ${valSize}px 'Segoe UI', Roboto, sans-serif`;
       ctx.fillText(val, mx, my + 22);
     });
 
-    // Right 5-Day Forecast Card (x: 440..940, y: 75..455)
-    fillRoundRect(ctx, 440, 75, 500, 380, 14, PALETTE.paper, PALETTE.ink, 2);
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("5-DAY FORECAST  (sensor.lilygo_t5_weather_forecast_compact)", 460, 100);
+    // Right 5-Day Outlook Card (x: 440..940, y: 75..455)
+    drawCard(ctx, 440, 75, 500, 380, false, 2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("5-DAY OUTLOOK (COMPACT HA STREAM)", 464, 92);
 
     const days = w.forecastCsv.split(";").map((entry) => {
       const [day, cond, hi, lo] = entry.split("|");
-      return { day, cond, hiF: Number(hi), loF: Number(lo) };
+      return { day: day.toUpperCase(), cond, hiF: Number(hi), loF: Number(lo) };
     });
 
     const minAll = Math.min(...days.map((d) => d.loF));
@@ -1132,187 +1191,250 @@
     const span = Math.max(1, maxAll - minAll);
 
     days.forEach((d, idx) => {
-      const colW = 92;
-      const cx = 456 + idx * 95 + colW / 2;
-      const boxX = 456 + idx * 95;
+      const colX = 452 + idx * 96;
+      const cx = colX + 44;
 
-      fillRoundRect(ctx, boxX, 122, colW, 312, 10, idx === 0 ? PALETTE.g14 : PALETTE.paper, PALETTE.g12, 1.2);
+      if (idx > 0) {
+        ctx.fillStyle = PALETTE.ink;
+        ctx.fillRect(colX, 125, 1, 310);
+      }
 
       ctx.fillStyle = PALETTE.ink;
-      ctx.font = "700 16px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(d.day, cx, 148);
-
-      drawWeatherIcon(ctx, d.cond, cx, 202, 1.15, PALETTE.ink);
-
       ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(d.day, cx, 130);
+
+      drawWeatherIcon(ctx, d.cond, cx, 191, 1.0, PALETTE.ink);
+
+      ctx.font = "700 24px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(`${Math.round(Number(formatTempNum(d.hiF, 0)))}°`, cx, 232);
+
+      // Sharp vertical temperature range bar
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - 5.5, 272.5, 11, 95);
+      const yTop = 274 + Math.round(((maxAll - d.hiF) / span) * 76);
+      const yBot = 274 + Math.round(((maxAll - d.loF) / span) * 76) + 16;
       ctx.fillStyle = PALETTE.ink;
-      ctx.fillText(formatTemp(d.hiF, 0), cx, 256);
+      ctx.fillRect(cx - 4, yTop, 8, Math.max(14, yBot - yTop));
 
-      // Vertical Temperature Range Bar (y: 276..384)
-      const barTop = 276;
-      const barH = 108;
-      fillRoundRect(ctx, cx - 6, barTop, 12, barH, 6, PALETTE.g14, PALETTE.g12, 1);
-
-      const yTop = barTop + Math.round(((maxAll - d.hiF) / span) * (barH - 18));
-      const yBot = barTop + Math.round(((maxAll - d.loF) / span) * (barH - 18)) + 18;
-      fillRoundRect(ctx, cx - 6, yTop, 12, Math.max(16, yBot - yTop), 6, PALETTE.ink, PALETTE.ink, 1);
-
-      ctx.font = "600 15px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillStyle = PALETTE.g06;
-      ctx.fillText(formatTemp(d.loF, 0), cx, 408);
+      ctx.font = "400 18px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(`${Math.round(Number(formatTempNum(d.loF, 0)))}°`, cx, 382);
     });
     ctx.textAlign = "left";
   }
 
   function renderTab2Climate() {
     // Left 2x2 Room Grid (x: 20..580, y: 75..455)
-    const roomBoxes = [
-      { x: 20, y: 75, w: 270, h: 180 },
-      { x: 310, y: 75, w: 270, h: 180 },
-      { x: 20, y: 275, w: 270, h: 180 },
-      { x: 310, y: 275, w: 270, h: 180 }
+    const roomPositions = [
+      { x: 20, y: 75 },
+      { x: 310, y: 75 },
+      { x: 20, y: 270 },
+      { x: 310, y: 270 }
     ];
 
     state.rooms.forEach((room, idx) => {
-      const b = roomBoxes[idx];
-      fillRoundRect(ctx, b.x, b.y, b.w, b.h, 12, PALETTE.paper, PALETTE.ink, 2);
+      const pos = roomPositions[idx];
+      drawCard(ctx, pos.x, pos.y, 270, 185, false, 2);
 
       ctx.fillStyle = PALETTE.ink;
-      ctx.font = "700 17px 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
       ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(room.name, b.x + 18, b.y + 28);
+      ctx.textBaseline = "top";
+      ctx.fillText(room.name, pos.x + 18, pos.y + 16);
 
-      const comfort = getRoomComfort(room.tempF, room.hum);
-      fillRoundRect(ctx, b.x + 18, b.y + 132, 92, 26, 13, comfort === "COMFORT" ? PALETTE.g14 : PALETTE.ink, PALETTE.ink, 1.2);
-      ctx.fillStyle = comfort === "COMFORT" ? PALETTE.ink : PALETTE.paper;
-      ctx.font = "700 11px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(comfort, b.x + 64, b.y + 145);
+      ctx.font = "700 36px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(`${formatTempNum(room.tempF, 1)}°`, pos.x + 18, pos.y + 54);
 
-      ctx.fillStyle = PALETTE.ink;
-      ctx.font = "700 38px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(formatTemp(room.tempF, 1), b.x + 18, b.y + 84);
-
-      ctx.fillStyle = PALETTE.g04;
-      ctx.font = "700 20px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(`${room.hum}% RH`, b.x + b.w - 18, b.y + 145);
-
-      // Humidity micro-bar
-      fillRoundRect(ctx, b.x + 130, b.y + 114, 120, 8, 4, PALETTE.g14, PALETTE.g12, 1);
-      fillRoundRect(ctx, b.x + 130, b.y + 114, Math.round((120 * room.hum) / 100), 8, 4, PALETTE.g04, null);
+      if (room.isEspresso) {
+        ctx.font = "400 18px 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText("Decent DE1Pro Head", pos.x + 18, pos.y + 114);
+        const brewState = room.tempF > 175 ? "BREW TEMP READY" : "STANDBY / WARMING";
+        ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText(brewState, pos.x + 18, pos.y + 148);
+      } else {
+        ctx.font = "400 18px 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText(`Humidity: ${room.hum}%`, pos.x + 18, pos.y + 114);
+        const comfort = (room.tempF >= 67 && room.tempF <= 74 && room.hum >= 35 && room.hum <= 55)
+          ? "OPTIMAL COMFORT"
+          : "CHECK ZONE";
+        ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText(comfort, pos.x + 18, pos.y + 148);
+      }
     });
 
     // Right HVAC & Air Quality Panel (x: 600..940, y: 75..455)
-    fillRoundRect(ctx, 600, 75, 340, 380, 14, PALETTE.paper, PALETTE.ink, 2);
+    drawCard(ctx, 600, 75, 340, 380, false, 2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("MAIN HVAC THERMOSTAT", 622, 92);
 
     const hvacMode = state.hvac.modes[state.hvac.modeIndex];
-    fillRoundRect(ctx, 625, 92, 290, 40, 10, PALETTE.ink, PALETTE.ink, 1.5);
-    ctx.fillStyle = PALETTE.paper;
-    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`THERMOSTAT: ${hvacMode}  (TAP TO CYCLE)`, 770, 112);
-
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "700 12px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(`CURRENT: ${formatTemp(state.hvac.currentTempF, 0)}`, 770, 160);
-
-    ctx.fillStyle = PALETTE.g04;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("TARGET SETPOINT", 770, 198);
-
-    ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 54px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(formatTemp(state.hvac.targetTempF, 0), 770, 248);
-
-    // [-] Button: x: 625..710, y: 295..355
-    fillRoundRect(ctx, 625, 295, 85, 60, 10, PALETTE.g14, PALETTE.ink, 2);
-    ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 32px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("-", 667.5, 325);
-
-    // Center delta readout between [-] and [+]
     const diff = state.hvac.targetTempF - state.hvac.currentTempF;
-    const actionStr = hvacMode === "OFF"
-      ? "IDLE"
-      : diff > 0 && (hvacMode === "HEAT" || hvacMode === "AUTO")
-        ? "HEATING"
-        : diff < 0 && (hvacMode === "COOL" || hvacMode === "AUTO")
-          ? "COOLING"
-          : "SATISFIED";
-    ctx.fillStyle = PALETTE.g04;
-    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(actionStr, 770, 325);
+    const hvacAction = hvacMode === "off"
+      ? "idle"
+      : diff > 0 && (hvacMode === "heat" || hvacMode === "auto")
+        ? "heating"
+        : diff < 0 && (hvacMode === "cool" || hvacMode === "auto")
+          ? "cooling"
+          : "idle";
 
-    // [+] Button: x: 830..915, y: 295..355
-    fillRoundRect(ctx, 830, 295, 85, 60, 10, PALETTE.g14, PALETTE.ink, 2);
+    ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`Mode: ${hvacMode} (${hvacAction})`, 622, 122);
+
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("CURRENT", 622, 165);
+    ctx.font = "700 36px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(formatTemp(state.hvac.currentTempF, 0), 622, 188);
+
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("TARGET SETPOINT", 790, 165);
+    ctx.font = "700 36px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(formatTemp(state.hvac.targetTempF, 0), 790, 188);
+
+    // Interactive [-] and [+] Touch Buttons (matching touch_navigation.yaml hitboxes)
+    drawCard(ctx, 625, 295, 85, 60, false, 2);
     ctx.fillStyle = PALETTE.ink;
-    ctx.font = "700 30px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("+", 872.5, 325);
+    ctx.font = "700 36px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("-", 667, 307);
 
-    // Divider & Indoor CO2 / AQI Bar (y: 375..442)
-    ctx.strokeStyle = PALETTE.g12;
-    ctx.beginPath();
-    ctx.moveTo(622, 372);
-    ctx.lineTo(918, 372);
-    ctx.stroke();
-
-    ctx.textAlign = "left";
-    ctx.fillStyle = PALETTE.ink;
     ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(`Indoor CO2: ${state.hvac.co2Ppm} ppm`, 625, 396);
-    ctx.textAlign = "right";
-    ctx.fillText(`AQI: ${state.hvac.aqi} (Good)`, 915, 396);
+    ctx.fillText("ADJUST", 770, 315);
 
-    // AQI Bar
-    fillRoundRect(ctx, 625, 416, 290, 16, 8, PALETTE.g14, PALETTE.ink, 1.5);
-    const aqiFill = Math.min(290, Math.max(18, Math.round((state.hvac.aqi / 150) * 290)));
-    fillRoundRect(ctx, 625, 416, aqiFill, 16, 8, PALETTE.ink, null);
+    drawCard(ctx, 830, 295, 85, 60, false, 2);
+    ctx.font = "700 36px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("+", 872, 307);
+
+    // Indoor Air Quality (CO2 ppm & AQI) at bottom of right panel
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(622, 372, 296, 1);
+
     ctx.textAlign = "left";
+    ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`CO2: ${state.hvac.co2Ppm} ppm`, 622, 386);
+    ctx.fillText(`AQI: ${state.hvac.aqi}`, 810, 386);
+
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Indoor Air Quality: GOOD  •  Ventilation Normal", 622, 418);
   }
 
   function renderTab3Power() {
     const soc = computeLipoSoc(state.lipoVoltage);
+    const charging = isChargingActive();
 
-    // Top-Left: 1S LiPo Discharge Curve Visualizer (x: 20..625, y: 75..245)
-    fillRoundRect(ctx, 20, 75, 605, 170, 12, PALETTE.paper, PALETTE.ink, 2);
+    // Row 1: Compact Power Mode Selector Buttons (y: 66..142, height 76px)
+    const modeButtons = [
+      { x: 20, idx: 0, title: "1. ALWAYS ONLINE", sub: "Modem Sleep • Use for OTA" },
+      { x: 335, idx: 1, title: "2. ADAPTIVE HYBRID", sub: "Day Live • Night/Low Sleep" },
+      { x: 650, idx: 2, title: "3. MAX BATTERY", sub: "15m Timer + Touch Wake" }
+    ];
+
+    modeButtons.forEach((btn) => {
+      const sel = state.powerModeIndex === btn.idx;
+      drawCard(ctx, btn.x, 66, 290, 76, sel, 2);
+      const fg = sel ? PALETTE.paper : PALETTE.ink;
+
+      ctx.fillStyle = fg;
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
+      ctx.font = "700 16px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(btn.title, btn.x + 14, 78);
+
+      ctx.textAlign = "right";
+      ctx.font = "700 12px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(sel ? "ACTIVE" : "SELECT", btn.x + 276, 80);
+
+      ctx.textAlign = "left";
+      ctx.font = "400 13.5px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(btn.sub, btn.x + 14, 110);
+    });
+
+    // Main Left Card (x: 20, y: 152, w: 605, h: 312)
+    drawCard(ctx, 20, 152, 605, 312, false, 2);
     ctx.fillStyle = PALETTE.ink;
     ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`1S LIPO DISCHARGE CURVE (3.20V - 4.20V)  •  ${state.lipoVoltage.toFixed(2)}V (${soc}%)`, 38, 97);
+    ctx.textBaseline = "top";
+    ctx.fillText("1S LIPO STATE OF CHARGE (SoC) CURVE & EST. RUNTIME", 38, 164);
 
-    // Graph area
-    const gx = 54;
-    const gy = 118;
-    const gw = 350;
-    const gh = 104;
+    // Left graph area (gx = 58, gy = 194, gw = 310, gh = 160)
+    const gx = 58;
+    const gy = 194;
+    const gw = 310;
+    const gh = 160;
 
-    ctx.strokeStyle = PALETTE.g12;
+    ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 1;
-    ctx.strokeRect(gx, gy, gw, gh);
+    ctx.strokeRect(gx + 0.5, gy + 0.5, gw - 1, gh - 1);
 
-    // 3.32V Critical threshold vertical dashed line
-    const vToX = (v) => gx + ((Math.max(3.20, Math.min(4.25, v)) - 3.20) / 1.05) * gw;
-    const sToY = (s) => gy + gh - (s / 100) * gh;
+    const vToX = (v) => gx + ((Math.max(3.30, Math.min(4.20, v)) - 3.30) / 0.90) * gw;
+    const sToY = (s) => gy + gh - (Math.max(0, Math.min(100, s)) / 100) * gh;
 
-    const critX = vToX(3.32);
-    ctx.save();
-    ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = PALETTE.g04;
-    ctx.beginPath();
-    ctx.moveTo(critX, gy);
-    ctx.lineTo(critX, gy + gh);
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "700 10px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("3.32V", critX + 3, gy + 12);
+    // Y-axis reference lines & labels (100%, 50%, 0%)
+    [
+      [100, "100%", gy],
+      [50, "50%", gy + gh / 2],
+      [0, "0%", gy + gh]
+    ].forEach(([pct, label, py]) => {
+      if (pct === 50) {
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = PALETTE.g10;
+        ctx.beginPath();
+        ctx.moveTo(gx, py);
+        ctx.lineTo(gx + gw, py);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = PALETTE.ink;
+      ctx.font = "400 11px 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = pct === 100 ? "top" : pct === 0 ? "bottom" : "middle";
+      ctx.fillText(label, gx - 5, py);
+    });
 
-    // Plot 11-point curve
+    // X-axis voltage ticks & labels below chart (y = gy + gh + 6)
+    ctx.textBaseline = "top";
+    ctx.font = "400 12px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillStyle = PALETTE.ink;
+    [3.3, 3.6, 3.9, 4.2].forEach((v) => {
+      const tx = vToX(v);
+      ctx.beginPath();
+      ctx.moveTo(tx, gy + gh);
+      ctx.lineTo(tx, gy + gh + 4);
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillText(`${v.toFixed(1)}V`, tx, gy + gh + 6);
+    });
+
+    // Vertical dashed markers: 3.32V critical & 3.77V (35% Hybrid)
+    const drawVMarker = (v, label, textY) => {
+      const mx = vToX(v);
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = PALETTE.g04;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(mx, gy);
+      ctx.lineTo(mx, gy + gh);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = PALETTE.g04;
+      ctx.font = "700 10.5px 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(label, mx + 3, textY);
+    };
+    drawVMarker(3.32, "3.32V", gy + 4);
+    drawVMarker(3.77, "3.77V (35%)", gy + 18);
+
+    // 11-point piecewise linear LiPo curve (3.30V..4.20V)
     ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
@@ -1324,77 +1446,156 @@
     }
     ctx.stroke();
 
-    // Current voltage marker dot
+    // Live operating point dot + outer ring + label
     const curX = vToX(state.lipoVoltage);
     const curY = sToY(soc);
     ctx.fillStyle = PALETTE.ink;
     ctx.beginPath();
-    ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+    ctx.arc(curX, curY, 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = PALETTE.paper;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = PALETTE.ink;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(curX, curY, 8, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Runtime estimates column (x: 422..612)
-    ctx.fillStyle = PALETTE.g06;
-    ctx.font = "700 11.5px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("EST. RUNTIME AT CURRENT SOC", 422, 122);
-    POWER_MODES.forEach((m, i) => {
-      const rem = (soc / 100) * m.estHoursAt100;
-      const ry = 148 + i * 28;
-      ctx.fillStyle = state.powerModeIndex === i ? PALETTE.ink : PALETTE.g06;
-      ctx.font = state.powerModeIndex === i ? "700 12.5px 'Segoe UI', Roboto, sans-serif" : "600 12px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(`${m.label.split(" ")[0]}: ${formatDurationHours(rem)}`, 422, ry);
+    const pointLabel = `${state.lipoVoltage.toFixed(2)}V (${soc}%)`;
+    ctx.font = "700 12px 'Segoe UI', Roboto, sans-serif";
+    const lblW = ctx.measureText(pointLabel).width;
+    const lblX = Math.max(gx + 4, Math.min(gx + gw - lblW - 4, curX - lblW / 2));
+    const lblY = curY - 24 >= gy + 4 ? curY - 24 : curY + 12;
+    ctx.fillStyle = PALETTE.paper;
+    ctx.fillRect(lblX - 2, lblY - 1, lblW + 4, 15);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(pointLabel, lblX, lblY);
+
+    // Right column (x: 388..610, y: 192..365): Live Runtime Calculator by Mode
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(378, 194, 1, 178);
+    ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(`RUNTIME @ ${soc}% SoC`, 388, 192);
+
+    const socFrac = Math.max(0, Math.min(1, soc / 100));
+    const hrsMode0 = 120.0 * socFrac;
+    const daysMode0 = 5.0 * socFrac;
+    const daysMode1 = 30.0 * socFrac;
+    const daysMode2 = 120.0 * socFrac;
+
+    const runtimeModes = [
+      {
+        idx: 0,
+        name: "ALWAYS ONLINE",
+        timeStr: hrsMode0 < 48 ? `${Math.round(hrsMode0)} hrs` : `${daysMode0.toFixed(1)} days`,
+        avgDraw: "~18mA"
+      },
+      {
+        idx: 1,
+        name: "ADAPTIVE HYBRID",
+        timeStr: `${Math.round(daysMode1)} days`,
+        avgDraw: "~1.2mA"
+      },
+      {
+        idx: 2,
+        name: "MAX BATTERY",
+        timeStr: `${Math.round(daysMode2)} days`,
+        avgDraw: "~0.35mA"
+      }
+    ];
+
+    runtimeModes.forEach((rm, i) => {
+      const ry = 218 + i * 50;
+      const isAct = state.powerModeIndex === rm.idx;
+      ctx.fillStyle = PALETTE.ink;
+      ctx.font = "700 13.5px 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(rm.name, 388, ry);
+
+      ctx.textAlign = "right";
+      ctx.fillText(rm.timeStr, 607, ry);
+
+      // Mini progress bar scaled by current SoC
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(388.5, ry + 20.5, 141, 9);
+      const fillW = Math.max(0, Math.round(socFrac * 138));
+      if (fillW > 0) {
+        ctx.fillStyle = isAct ? PALETTE.ink : PALETTE.g04;
+        ctx.fillRect(390, ry + 22, fillW, 6);
+      }
+
+      ctx.fillStyle = PALETTE.ink;
+      ctx.font = isAct ? "700 13px 'Segoe UI', Roboto, sans-serif" : "400 13px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(isAct ? "[ACTIVE]" : rm.avgDraw, 607, ry + 17);
     });
 
-    // Top-Right: Diagnostics Card (x: 650..940, y: 75..245)
-    fillRoundRect(ctx, 650, 75, 290, 170, 12, PALETTE.paper, PALETTE.ink, 2);
+    // Bottom summary strip inside Left Card (y: 384..452)
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(38, 384, 569, 1);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "400 13.5px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(
+      `Cell: ${state.lipoVoltage.toFixed(2)}V  •  SoC: ${soc}%  •  Cutoff: 3.32V  •  Hybrid Shift: <=35% (3.77V)`,
+      38,
+      394
+    );
+    ctx.font = "700 13px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Tip: Select '1. ALWAYS ONLINE' when pushing wireless OTA firmware updates.", 38, 420);
+
+    // Main Right Card: LiPo Telemetry & Diagnostics (x: 650, y: 152, w: 290, h: 240)
+    drawCard(ctx, 650, 152, 290, 240, false, 2);
     ctx.fillStyle = PALETTE.ink;
     ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("SYSTEM DIAGNOSTICS", 668, 97);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("LIPO TELEMETRY (GPIO14)", 668, 164);
 
-    const diagLines = [
-      ["Wakeup:", state.wakeCause],
-      ["Wi-Fi RSSI:", `${state.wifiRssi} dBm (Light Sleep)`],
-      ["Refreshes:", `${state.partialRefreshCount}/${state.maxPartialBeforeClean} partial • ${state.fullRefreshCount} full`],
-      ["OTA Lock:", state.stayAwakeOta ? "STAY AWAKE (ON)" : "Auto Sleep Allowed"]
-    ];
-    diagLines.forEach(([k, v], i) => {
-      const dy = 128 + i * 27;
-      ctx.fillStyle = PALETTE.g06;
-      ctx.font = "700 12px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(k, 668, dy);
+    ctx.font = "700 24px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`${state.lipoVoltage.toFixed(2)} V  (${soc}%)`, 668, 188);
+
+    // SoC Progress Bar (x: 668, y: 222, w: 254, h: 18)
+    ctx.strokeStyle = PALETTE.ink;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(668.5, 222.5, 253, 17);
+    const barW = Math.max(0, Math.min(250, Math.round((soc / 100) * 250)));
+    if (barW > 0) {
       ctx.fillStyle = PALETTE.ink;
-      ctx.font = "600 12px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(v, 738, dy);
-    });
+      ctx.fillRect(670, 224, barW, 14);
+    }
 
-    // Bottom Row (y: 265..435): 3 Power Mode Cards mapped to grid columns
-    const modeCards = [
-      { x: 20, title: "ALWAYS ONLINE", sub: "Modem Light Sleep", est: "~18-24 hrs / charge", foot: "Instant HA push updates" },
-      { x: 335, title: "ADAPTIVE HYBRID", sub: "Smart Sleep <35% / Night", est: "~4-7 days / charge", foot: "Recommended balance" },
-      { x: 650, title: state.powerModeIndex === 2 ? "SLEEP NOW (EXT0)" : "MAX BATTERY", sub: "Deep Sleep + GPIO16 Wake", est: "~25-35 days / charge", foot: state.powerModeIndex === 2 ? "Tap again -> Deep Sleep" : "15m PCF8563 RTC wake" }
-    ];
+    const qStart = String(state.quietStartHour).padStart(2, "0");
+    const qEnd = String(state.quietEndHour).padStart(2, "0");
+    const totalRefreshes = state.fullRefreshCount + state.partialRefreshCount;
 
-    modeCards.forEach((card, idx) => {
-      const active = state.powerModeIndex === idx;
-      fillRoundRect(ctx, card.x, 265, 290, 170, 12, active ? PALETTE.ink : PALETTE.paper, PALETTE.ink, 2);
-      ctx.fillStyle = active ? PALETTE.paper : PALETTE.ink;
-      ctx.font = "700 18px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(card.title, card.x + 20, 300);
+    ctx.font = "700 13.5px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`State: ${charging ? "USB-C CHARGING" : "1S LIPO DISCHARGING"}`, 668, 250);
+    ctx.font = "400 13.5px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`Wake: ${state.wakeCause}`, 668, 274);
+    ctx.fillText(`Wi-Fi: ${state.wifiRssi} dBm  •  Up: ${state.uptimeSeconds}s`, 668, 298);
+    ctx.fillText(`Quiet Hours: ${qStart}:00 - ${qEnd}:00`, 668, 322);
+    ctx.fillText(`EPD Refreshes: ${totalRefreshes} cycles`, 668, 346);
 
-      ctx.fillStyle = active ? PALETTE.g12 : PALETTE.g04;
-      ctx.font = "600 13.5px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(card.sub, card.x + 20, 334);
-      ctx.fillText(card.est, card.x + 20, 362);
+    // Bottom-Right Compact Action Buttons (y: 402..464, height 62px)
+    drawCard(ctx, 650, 402, 138, 62, false, 2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "700 16px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("[ CLEAN ]", 719, 414);
+    ctx.font = "400 13px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Anti-Ghosting", 719, 438);
 
-      fillRoundRect(ctx, card.x + 20, 386, 250, 30, 8, active ? PALETTE.paper : PALETTE.g14, active ? PALETTE.paper : PALETTE.ink, 1);
-      ctx.fillStyle = PALETTE.ink;
-      ctx.font = "700 12px 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(active ? (idx === 2 ? "ACTIVE — TAP TO SLEEP NOW" : "ACTIVE PROFILE") : card.foot, card.x + 145, 401);
-      ctx.textAlign = "left";
-    });
+    drawCard(ctx, 802, 402, 138, 62, false, 2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = "700 16px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("[ SLEEP ]", 871, 414);
+    ctx.font = "400 13px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Deep Sleep Now", 871, 438);
+    ctx.textAlign = "left";
   }
 
   function renderCriticalHibernateOverlay() {
@@ -1608,11 +1809,13 @@
     }
 
     const hit = findHitboxAt(x, y);
+    state.lastTouch = { x, y };
     if (hit) {
       logEvent("touch", "GT911", `Touch (x=${x}, y=${y}) -> hitbox: ${hit.id}`);
       hit.action(ev);
     } else {
       logEvent("touch", "GT911", `Touch (x=${x}, y=${y}) -> no active hitbox (sleep timer reset)`);
+      renderAll();
     }
   });
 

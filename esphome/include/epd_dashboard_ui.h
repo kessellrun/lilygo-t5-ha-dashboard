@@ -153,7 +153,7 @@ inline void render_header(esphome::display::Display &it) {
   it.printf(588, 11, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
             "%.0f%% • %.2fV", soc, vbat);
   it.printf(588, 33, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "%s", chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA STAY-AWAKE" : "1S LIPO ACTIVE"));
+            "%s", chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
 
   // Header Quick Button 1: [REFRESH] (x: 740..845, y: 8..48)
   draw_card(it, 740, 8, 105, 40, false, 2);
@@ -183,7 +183,7 @@ inline void render_navbar(esphome::display::Display &it) {
     {  0, 240, "\U000F07D0", "CONTROLS"},
     {240, 240, "\U000F0595", "WEATHER"},
     {480, 240, "\U000F050F", "CLIMATE"},
-    {720, 240, "\U000F0079", "LIPO & POWER"}
+    {720, 240, "\U000F0079", "POWER"}
   };
 
   int cur_tab = id(active_tab);
@@ -199,8 +199,10 @@ inline void render_navbar(esphome::display::Display &it) {
     }
     auto fg = active ? esphome::display::COLOR_OFF : esphome::display::COLOR_ON;
     int cx = kTabs[i].x + kTabs[i].w / 2;
-    it.print(cx - 48, NAVBAR_Y + 19, &id(font_mdi_22), fg, esphome::display::TextAlign::TOP_CENTER, kTabs[i].icon);
-    it.print(cx + 14, NAVBAR_Y + 22, &id(font_bold_18), fg, esphome::display::TextAlign::TOP_CENTER, kTabs[i].title);
+    int icon_x = (i == 3) ? (cx - 42) : (cx - 54);
+    int text_x = cx + 12;
+    it.print(icon_x, NAVBAR_Y + 19, &id(font_mdi_22), fg, esphome::display::TextAlign::TOP_CENTER, kTabs[i].icon);
+    it.print(text_x, NAVBAR_Y + 22, &id(font_bold_18), fg, esphome::display::TextAlign::TOP_CENTER, kTabs[i].title);
   }
 }
 
@@ -468,92 +470,218 @@ inline void render_tab_climate(esphome::display::Display &it, const DashboardLab
 }
 
 // ==============================================================================
-// 7. Tab 3: LiPo Battery & System Diagnostics (2x3 Interactive Power Grid)
+// 7. Tab 3: Power Profiles, 1S LiPo SoC Curve & Runtime Calculator + Telemetry
 // ==============================================================================
 inline void render_tab_power(esphome::display::Display &it) {
   int cur_mode = id(power_mode_index);
-  bool ota_lock = id(ha_stay_awake_ota).state;
+  float vbat = id(lipo_voltage).state;
+  float soc  = id(lipo_battery_level).state;
+  bool chg   = id(lipo_charging).state;
+  if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
 
-  // Row 1 (y: 75..245): 3 Selectable Power Mode Cards mapped to touch_grid_1..3
+  // 1. Row 1 (y: 66..142, h: 76): 3 Compact Power Mode Selector Buttons
   struct ModeCard {
     int x;
     int mode_idx;
     const char *title;
-    const char *line1;
-    const char *line2;
-    const char *runtime;
+    const char *subtitle;
   };
-  ModeCard modes[3] = {
-    { 20, 0, "1. ALWAYS ONLINE",   "Wi-Fi Light Modem Sleep",   "Instant HA Push Updates",  "~5-6 Days (3000mAh)"},
-    {335, 1, "2. ADAPTIVE HYBRID", "Daytime Live / Night Sleep", "Auto Deep Sleep <35% SoC", "~3-5 Weeks (Recommended)"},
-    {650, 2, "3. MAX BATTERY",     "15m Periodic Timer Wake",   "+ Instant GPIO16 Touch Wake", "~3-5 Months (3000mAh)"}
+  static const ModeCard kModes[3] = {
+    { 20, 0, "1. ALWAYS ONLINE",   "Modem Sleep • Use for OTA"},
+    {335, 1, "2. ADAPTIVE HYBRID", "Day Live • Night/Low Sleep"},
+    {650, 2, "3. MAX BATTERY",     "15m Timer + Touch Wake"}
   };
 
   for (int i = 0; i < 3; i++) {
-    bool sel = (cur_mode == modes[i].mode_idx);
-    draw_card(it, modes[i].x, 75, 290, 170, sel, 2);
+    bool sel = (cur_mode == kModes[i].mode_idx);
+    draw_card(it, kModes[i].x, 66, 290, 76, sel, 2);
     auto fg = sel ? esphome::display::COLOR_OFF : esphome::display::COLOR_ON;
 
-    it.print(modes[i].x + 18, 92, &id(font_bold_18), fg, esphome::display::TextAlign::TOP_LEFT, modes[i].title);
-    it.print(modes[i].x + 18, 128, &id(font_regular_14), fg, esphome::display::TextAlign::TOP_LEFT, modes[i].line1);
-    it.print(modes[i].x + 18, 150, &id(font_regular_14), fg, esphome::display::TextAlign::TOP_LEFT, modes[i].line2);
-    it.print(modes[i].x + 18, 185, &id(font_bold_14), fg, esphome::display::TextAlign::TOP_LEFT, modes[i].runtime);
-    it.print(modes[i].x + 18, 212, &id(font_bold_14), fg, esphome::display::TextAlign::TOP_LEFT,
-             sel ? "[ ACTIVE PROFILE ]" : "TAP TO SELECT");
+    it.print(kModes[i].x + 14, 78, &id(font_bold_18), fg, esphome::display::TextAlign::TOP_LEFT, kModes[i].title);
+    it.print(kModes[i].x + 276, 81, &id(font_bold_14), fg, esphome::display::TextAlign::TOP_RIGHT,
+             sel ? "ACTIVE" : "SELECT");
+    it.print(kModes[i].x + 14, 108, &id(font_regular_14), fg, esphome::display::TextAlign::TOP_LEFT, kModes[i].subtitle);
   }
 
-  // Row 2, Col 1 (x: 20..310, y: 265..435): 1S LiPo Telemetry + Full Refresh Action
-  draw_card(it, 20, 265, 290, 170, false, 2);
-  float vbat = id(lipo_voltage).state;
-  float soc  = id(lipo_battery_level).state;
-  if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
+  // 2. Main Left Card (x: 20, y: 152, w: 605, h: 312):
+  //    1S LiPo State of Charge (SoC) Curve & Mode Runtime Comparison
+  draw_card(it, 20, 152, 605, 312, false, 2);
+  it.print(38, 164, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+           "1S LIPO STATE OF CHARGE (SoC) CURVE & EST. RUNTIME");
 
-  it.print(38, 280, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "1S LIPO TELEMETRY (GPIO14)");
-  it.printf(38, 304, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+  // --- Left side inside card: 11-Point LiPo Discharge Curve (gx=58, gy=194, gw=310, gh=160) ---
+  const int gx = 58;
+  const int gy = 194;
+  const int gw = 310;
+  const int gh = 160;
+  it.rectangle(gx, gy, gw, gh, esphome::display::COLOR_ON);
+
+  // Horizontal reference grid line at 50% SoC + Y-axis labels (100%, 50%, 0%)
+  for (int dx = gx + 4; dx < gx + gw - 2; dx += 6) {
+    it.line(dx, gy + gh / 2, dx + 2, gy + gh / 2, esphome::display::COLOR_ON);
+  }
+  it.print(gx - 5, gy - 6, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, "100%");
+  it.print(gx - 5, gy + gh / 2 - 7, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, "50%");
+  it.print(gx - 5, gy + gh - 8, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, "0%");
+
+  // X-axis voltage ticks & labels below chart (y = gy + gh + 6)
+  static const float kVoltTicks[4] = {3.30f, 3.60f, 3.90f, 4.20f};
+  static const char *kVoltLabels[4] = {"3.3V", "3.6V", "3.9V", "4.2V"};
+  for (int t = 0; t < 4; t++) {
+    int tx = gx + (int)(((kVoltTicks[t] - 3.30f) / 0.90f) * gw);
+    it.line(tx, gy + gh, tx, gy + gh + 4, esphome::display::COLOR_ON);
+    it.print(tx, gy + gh + 6, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER, kVoltLabels[t]);
+  }
+
+  // Vertical dashed threshold lines: 3.32V (Critical Cutoff) and 3.77V (35% Hybrid Sleep Threshold)
+  int x_crit = gx + (int)(((3.32f - 3.30f) / 0.90f) * gw);
+  int x_hyb  = gx + (int)(((3.77f - 3.30f) / 0.90f) * gw);
+  for (int dy = gy + 3; dy < gy + gh - 3; dy += 6) {
+    it.line(x_crit, dy, x_crit, dy + 3, esphome::display::COLOR_ON);
+    it.line(x_hyb, dy, x_hyb, dy + 3, esphome::display::COLOR_ON);
+  }
+
+  // Plot 11-point piecewise linear 1S LiPo discharge curve (3.30V=0% .. 4.20V=100%)
+  struct CurvePt { float v; float s; };
+  static const CurvePt kCurve[11] = {
+    {3.30f,   0.0f},
+    {3.61f,  10.0f},
+    {3.70f,  20.0f},
+    {3.75f,  30.0f},
+    {3.79f,  40.0f},
+    {3.82f,  50.0f},
+    {3.87f,  60.0f},
+    {3.92f,  70.0f},
+    {3.98f,  80.0f},
+    {4.06f,  90.0f},
+    {4.20f, 100.0f}
+  };
+  for (int i = 0; i < 10; i++) {
+    int x0 = gx + (int)(((kCurve[i].v - 3.30f) / 0.90f) * gw);
+    int y0 = gy + gh - (int)((kCurve[i].s / 100.0f) * gh);
+    int x1 = gx + (int)(((kCurve[i + 1].v - 3.30f) / 0.90f) * gw);
+    int y1 = gy + gh - (int)((kCurve[i + 1].s / 100.0f) * gh);
+    it.line(x0, y0, x1, y1, esphome::display::COLOR_ON);
+    it.line(x0, y0 + 1, x1, y1 + 1, esphome::display::COLOR_ON);
+  }
+
+  // Live operating point marker on the curve at (vbat, soc)
+  float v_clamp = (vbat < 3.30f) ? 3.30f : ((vbat > 4.20f) ? 4.20f : vbat);
+  float s_clamp = (soc < 0.0f) ? 0.0f : ((soc > 100.0f) ? 100.0f : soc);
+  int cur_x = gx + (int)(((v_clamp - 3.30f) / 0.90f) * gw);
+  int cur_y = gy + gh - (int)((s_clamp / 100.0f) * gh);
+  it.filled_circle(cur_x, cur_y, 5, esphome::display::COLOR_ON);
+  it.circle(cur_x, cur_y, 8, esphome::display::COLOR_ON);
+
+  int lbl_y = (cur_y < gy + 24) ? (cur_y + 8) : (cur_y - 20);
+  if (cur_x > gx + gw - 115) {
+    it.printf(cur_x - 12, lbl_y, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT,
+              "%.2fV (%.0f%%)", vbat, soc);
+  } else {
+    it.printf(cur_x + 12, lbl_y, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+              "%.2fV (%.0f%%)", vbat, soc);
+  }
+
+  // --- Right side inside card (x: 388..610, y: 192..365): Live Runtime Calculator by Mode ---
+  it.line(378, 194, 378, 372, esphome::display::COLOR_ON);
+  it.printf(388, 192, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "RUNTIME @ %.0f%% SoC", soc);
+
+  float soc_frac = s_clamp / 100.0f;
+  float hrs_mode0  = 120.0f * soc_frac;  // Full = 120h (5.0d) on 2500mAh 1S LiPo
+  float days_mode0 = 5.0f * soc_frac;
+  float days_mode1 = 30.0f * soc_frac;   // Full = 720h (30.0d)
+  float days_mode2 = 120.0f * soc_frac;  // Full = 2880h (120.0d)
+
+  char rt0_buf[24];
+  if (hrs_mode0 < 48.0f) {
+    snprintf(rt0_buf, sizeof(rt0_buf), "%.0f hrs", hrs_mode0);
+  } else {
+    snprintf(rt0_buf, sizeof(rt0_buf), "%.1f days", days_mode0);
+  }
+  char rt1_buf[24];
+  snprintf(rt1_buf, sizeof(rt1_buf), "%.0f days", days_mode1);
+  char rt2_buf[24];
+  snprintf(rt2_buf, sizeof(rt2_buf), "%.0f days", days_mode2);
+
+  struct RuntimeRow {
+    const char *label;
+    const char *val_str;
+    const char *avg_draw;
+  };
+  RuntimeRow rows[3] = {
+    {"ALWAYS ONLINE",   rt0_buf, "~18mA"},
+    {"ADAPTIVE HYBRID", rt1_buf, "~1.2mA"},
+    {"MAX BATTERY",     rt2_buf, "~0.35mA"}
+  };
+
+  for (int m = 0; m < 3; m++) {
+    int ry = 218 + m * 50;
+    bool is_act = (cur_mode == m);
+    it.print(388, ry, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT, rows[m].label);
+    it.print(607, ry, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, rows[m].val_str);
+
+    // Mini progress bar scaled by current SoC
+    it.rectangle(388, ry + 20, 142, 10, esphome::display::COLOR_ON);
+    int mw = (int)(soc_frac * 138.0f);
+    if (mw > 0) {
+      it.filled_rectangle(390, ry + 22, mw, 6, esphome::display::COLOR_ON);
+    }
+
+    if (is_act) {
+      it.print(607, ry + 17, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, "[ACTIVE]");
+    } else {
+      it.print(607, ry + 17, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, rows[m].avg_draw);
+    }
+  }
+
+  // --- Bottom summary strip inside Left Card (y: 384..452) ---
+  it.line(38, 384, 607, 384, esphome::display::COLOR_ON);
+  it.printf(38, 394, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "Cell: %.2fV  •  SoC: %.0f%%  •  Cutoff: 3.32V  •  Hybrid Shift: <=35%% (3.77V)", vbat, soc);
+  it.print(38, 418, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+           "Tip: Select '1. ALWAYS ONLINE' when pushing wireless OTA firmware updates.");
+
+  // 3. Main Right Card (x: 650, y: 152, w: 290, h: 240): 1S LiPo Telemetry & Diagnostics
+  draw_card(it, 650, 152, 290, 240, false, 2);
+  it.print(668, 164, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+           "LIPO TELEMETRY (GPIO14)");
+  it.printf(668, 188, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
             "%.2f V  (%.0f%%)", vbat, soc);
 
-  // 1S LiPo Charge Progress Bar (3.30V .. 4.20V)
-  it.rectangle(38, 342, 254, 18, esphome::display::COLOR_ON);
-  int bar_w = (int)((soc / 100.0f) * 250.0f);
-  if (bar_w < 0) bar_w = 0;
-  if (bar_w > 250) bar_w = 250;
-  it.filled_rectangle(40, 344, bar_w, 14, esphome::display::COLOR_ON);
-
-  it.printf(38, 372, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "Refreshes: %d  •  Tap to Clean Screen", id(refresh_counter));
-  it.print(38, 398, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "[ TAP: ANTI-GHOSTING CLEAN ]");
-
-  // Row 2, Col 2 (x: 335..625, y: 265..435): OTA Stay-Awake Lock & Wake Reason
-  draw_card(it, 335, 265, 290, 170, ota_lock, 2);
-  auto fg2 = ota_lock ? esphome::display::COLOR_OFF : esphome::display::COLOR_ON;
-  it.print(353, 280, &id(font_bold_14), fg2, esphome::display::TextAlign::TOP_LEFT,
-           "OTA STAY-AWAKE LOCK");
-  it.printf(353, 306, &id(font_bold_24), fg2, esphome::display::TextAlign::TOP_LEFT,
-            "%s", ota_lock ? "LOCKED AWAKE" : "AUTO SLEEP OK");
+  // SoC Progress Bar (x: 668, y: 222, w: 254, h: 18)
+  it.rectangle(668, 222, 254, 18, esphome::display::COLOR_ON);
+  int bar_w = (int)(soc_frac * 250.0f);
+  if (bar_w > 0) {
+    it.filled_rectangle(670, 224, bar_w, 14, esphome::display::COLOR_ON);
+  }
 
   std::string wake = id(wake_reason_text).state;
   if (wake.empty()) wake = "Cold Boot / USB";
-  it.printf(353, 346, &id(font_regular_14), fg2, esphome::display::TextAlign::TOP_LEFT,
-            "Wake: %s", wake.c_str());
-  it.printf(353, 370, &id(font_regular_14), fg2, esphome::display::TextAlign::TOP_LEFT,
-            "Wi-Fi RSSI: %.0f dBm  •  Up: %.0fs", id(wifi_rssi).state, id(uptime_sec).state);
-  it.print(353, 398, &id(font_bold_14), fg2, esphome::display::TextAlign::TOP_LEFT,
-           "[ TAP: TOGGLE OTA LOCK ]");
+  float rssi_val = isnan(id(wifi_rssi).state) ? -58.0f : id(wifi_rssi).state;
+  float up_val   = isnan(id(uptime_sec).state) ? (millis() / 1000.0f) : id(uptime_sec).state;
+  int q_start    = !isnan(id(ha_quiet_start).state) ? (int)id(ha_quiet_start).state : 23;
+  int q_end      = !isnan(id(ha_quiet_end).state)   ? (int)id(ha_quiet_end).state   : 6;
 
-  // Row 2, Col 3 (x: 650..940, y: 265..435): Enter Touch-Armed Deep Sleep Now
-  draw_card(it, 650, 265, 290, 170, false, 2);
-  it.print(668, 280, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "DEEP SLEEP & TOUCH WAKE");
-  it.print(668, 306, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "SLEEP NOW");
-  it.print(668, 346, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "Arms GT911 GPIO16 EXT0 Wakeup");
-  it.print(668, 370, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "+ PCF8563 15m Timer (~350 uA)");
-  it.print(668, 398, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-           "[ TAP: ENTER DEEP SLEEP ]");
+  it.printf(668, 250, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "State: %s", chg ? "USB-C CHARGING" : "1S LIPO DISCHARGING");
+  it.printf(668, 274, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "Wake: %s", wake.c_str());
+  it.printf(668, 298, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "Wi-Fi: %.0f dBm  •  Up: %.0fs", rssi_val, up_val);
+  it.printf(668, 322, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "Quiet Hours: %02d:00 - %02d:00", q_start, q_end);
+  it.printf(668, 346, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "EPD Refreshes: %d cycles", id(refresh_counter));
+
+  // 4. Bottom-Right Compact Action Buttons (y: 402..464, h: 62)
+  draw_card(it, 650, 402, 138, 62, false, 2);
+  it.print(719, 412, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER, "[ CLEAN ]");
+  it.print(719, 434, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER, "Anti-Ghosting");
+
+  draw_card(it, 802, 402, 138, 62, false, 2);
+  it.print(871, 412, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER, "[ SLEEP ]");
+  it.print(871, 434, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER, "Deep Sleep Now");
 }
 
 // ==============================================================================

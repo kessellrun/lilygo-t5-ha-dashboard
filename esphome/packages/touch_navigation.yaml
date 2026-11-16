@@ -63,7 +63,7 @@ binary_sensor:
 
   - platform: touchscreen
     id: touch_tab_3
-    name: "Touch Tab 3 (LiPo & Power)"
+    name: "Touch Tab 3 (Power)"
     touchscreen_id: gt911_touch
     x_min: 720
     x_max: 959
@@ -147,17 +147,6 @@ binary_sensor:
                   data:
                     entity_id: ${entity_ctrl_1}
               - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - lambda: 'id(power_mode_index) = 0;'
-              - homeassistant.service:
-                  service: input_select.select_option
-                  data:
-                    entity_id: ${entity_power_profile}
-                    option: "Always Online (Modem Sleep)"
-              - script.execute: request_screen_refresh
 
   # --- Grid Zone 2: Row 1, Col 2 (x: 335..625, y: 75..245) ---
   - platform: touchscreen
@@ -180,17 +169,6 @@ binary_sensor:
                   service: homeassistant.toggle
                   data:
                     entity_id: ${entity_ctrl_2}
-              - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - lambda: 'id(power_mode_index) = 1;'
-              - homeassistant.service:
-                  service: input_select.select_option
-                  data:
-                    entity_id: ${entity_power_profile}
-                    option: "Adaptive Hybrid (Recommended)"
               - script.execute: request_screen_refresh
 
   # --- Grid Zone 3: Row 1, Col 3 (x: 650..940, y: 75..245) ---
@@ -232,17 +210,6 @@ binary_sensor:
                       if (isnan(cur)) cur = 70.0f;
                       return cur + 1.0f;
               - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - lambda: 'id(power_mode_index) = 2;'
-              - homeassistant.service:
-                  service: input_select.select_option
-                  data:
-                    entity_id: ${entity_power_profile}
-                    option: "Max Battery (Deep Sleep + Touch Wake)"
-              - script.execute: request_screen_refresh
 
   # --- Grid Zone 4: Row 2, Col 1 (x: 20..310, y: 265..435) ---
   - platform: touchscreen
@@ -266,11 +233,6 @@ binary_sensor:
                   data:
                     entity_id: ${entity_ctrl_4}
               - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - script.execute: trigger_full_clean_refresh
 
   # --- Grid Zone 5: Row 2, Col 2 (x: 335..625, y: 265..435) ---
   - platform: touchscreen
@@ -293,15 +255,6 @@ binary_sensor:
                   service: homeassistant.toggle
                   data:
                     entity_id: ${entity_ctrl_5}
-              - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - homeassistant.service:
-                  service: input_boolean.toggle
-                  data:
-                    entity_id: ${entity_stay_awake_ota}
               - script.execute: request_screen_refresh
 
   # --- Grid Zone 6: Row 2, Col 3 (x: 650..940, y: 265..435) ---
@@ -343,11 +296,6 @@ binary_sensor:
                       if (isnan(cur)) cur = 70.0f;
                       return cur - 1.0f;
               - script.execute: request_screen_refresh
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 3;'
-            then:
-              - script.execute: enter_touch_armed_deep_sleep
 
   # ============================================================================
   # 4. Dedicated Tab 2 Thermostat Setpoint [-1] / [+1] Buttons
@@ -403,3 +351,122 @@ binary_sensor:
                       if (isnan(cur)) cur = 70.0f;
                       return cur + 1.0f;
               - script.execute: request_screen_refresh
+
+  # ============================================================================
+  # 5. Dedicated Tab 3 Power Mode Selector & Action Buttons
+  # ============================================================================
+  - platform: touchscreen
+    id: touch_pwr_mode_0
+    name: "Touch Power Mode 0 (Always Online)"
+    touchscreen_id: gt911_touch
+    x_min: 20
+    x_max: 310
+    y_min: 66
+    y_max: 142
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 3;'
+            then:
+              - lambda: 'id(power_mode_index) = 0;'
+              - homeassistant.service:
+                  service: input_select.select_option
+                  data:
+                    entity_id: ${entity_power_profile}
+                    option: "Always Online (Modem Sleep)"
+              - script.execute: request_screen_refresh
+              - script.execute: evaluate_power_state
+
+  - platform: touchscreen
+    id: touch_pwr_mode_1
+    name: "Touch Power Mode 1 (Adaptive Hybrid)"
+    touchscreen_id: gt911_touch
+    x_min: 335
+    x_max: 625
+    y_min: 66
+    y_max: 142
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 3;'
+            then:
+              - lambda: 'id(power_mode_index) = 1;'
+              - homeassistant.service:
+                  service: input_select.select_option
+                  data:
+                    entity_id: ${entity_power_profile}
+                    option: "Adaptive Hybrid (Recommended)"
+              - script.execute: request_screen_refresh
+              - script.execute: evaluate_power_state
+
+  - platform: touchscreen
+    id: touch_pwr_mode_2
+    name: "Touch Power Mode 2 (Max Battery)"
+    touchscreen_id: gt911_touch
+    x_min: 650
+    x_max: 940
+    y_min: 66
+    y_max: 142
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 3;'
+            then:
+              - lambda: 'id(power_mode_index) = 2;'
+              - homeassistant.service:
+                  service: input_select.select_option
+                  data:
+                    entity_id: ${entity_power_profile}
+                    option: "Max Battery (Deep Sleep + Touch Wake)"
+              - script.execute: request_screen_refresh
+              - script.execute: evaluate_power_state
+
+  - platform: touchscreen
+    id: touch_pwr_clean
+    name: "Touch Power Anti-Ghosting Clean"
+    touchscreen_id: gt911_touch
+    x_min: 650
+    x_max: 788
+    y_min: 402
+    y_max: 464
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 3;'
+            then:
+              - script.execute: trigger_full_clean_refresh
+
+  - platform: touchscreen
+    id: touch_pwr_sleep
+    name: "Touch Power Deep Sleep Now"
+    touchscreen_id: gt911_touch
+    x_min: 802
+    x_max: 940
+    y_min: 402
+    y_max: 464
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 3;'
+            then:
+              - script.execute: enter_touch_armed_deep_sleep
