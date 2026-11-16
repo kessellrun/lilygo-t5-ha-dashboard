@@ -1018,13 +1018,26 @@
     ctx.textBaseline = "top";
     ctx.fillText(`${soc}% • ${state.lipoVoltage.toFixed(2)}V`, 588, 11);
 
-    const batStatus = charging
-      ? "USB-C CHARGING"
-      : (state.powerModeIndex === 0 || state.stayAwakeOta)
-        ? "OTA / ALWAYS ON"
-        : "1S LIPO ACTIVE";
-    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText(batStatus, 588, 33);
+    if (state.isSleeping) {
+      // Upward arrow pointing at the top-edge physical wake button above the dot (x=632)
+      ctx.fillStyle = PALETTE.ink;
+      ctx.beginPath();
+      ctx.moveTo(632, 1);
+      ctx.lineTo(624, 10);
+      ctx.lineTo(640, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText("SLEEPING • PRESS BTN", 588, 33);
+    } else {
+      const batStatus = charging
+        ? "USB-C CHARGING"
+        : (state.powerModeIndex === 0 || state.stayAwakeOta)
+          ? "OTA / ALWAYS ON"
+          : "1S LIPO ACTIVE";
+      ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(batStatus, 588, 33);
+    }
 
     // Header Quick Buttons (y: 8..48)
     // [CLEAN] x: 740..845, y: 8..48
@@ -1721,6 +1734,22 @@
       else if (state.activeTab === 2) renderTab2Climate();
       else if (state.activeTab === 3) renderTab3Power();
       renderBottomTabs();
+
+      if (state.isSleeping) {
+        drawCard(ctx, 452, 56, 360, 26, true, 1);
+        ctx.fillStyle = PALETTE.ink;
+        ctx.beginPath();
+        ctx.moveTo(632, 48);
+        ctx.lineTo(624, 56);
+        ctx.lineTo(640, 56);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = PALETTE.paper;
+        ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("SLEEPING — PRESS TOP BUTTON TO WAKE", 632, 62);
+      }
     }
 
     renderEInkFlashEffects();

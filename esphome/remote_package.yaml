@@ -374,8 +374,13 @@ display:
       const char *bat_icon = chg ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
       it.print(560, 15, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
       it.printf(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
-      it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
-                chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
+      if (id(is_going_to_sleep)) {
+        it.filled_triangle(632, 1, 624, 10, 640, 10, COLOR_ON);
+        it.print(588, 33, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "SLEEPING • PRESS BTN");
+      } else {
+        it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
+                  chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
+      }
 
       draw_card(740, 8, 105, 40, false, 2);
       it.print(752, 17, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
@@ -768,4 +773,10 @@ display:
         int text_x = cx + 12;
         it.print(icon_x, NAVBAR_Y + 19, id(font_mdi_22), fg, TextAlign::TOP_CENTER, kTabs[i].icon);
         it.print(text_x, NAVBAR_Y + 22, id(font_bold_18), fg, TextAlign::TOP_CENTER, kTabs[i].title);
+      }
+
+      if (id(is_going_to_sleep)) {
+        draw_card(452, 56, 360, 26, true, 1);
+        it.filled_triangle(632, 48, 624, 56, 640, 56, COLOR_ON);
+        it.print(632, 62, id(font_bold_14), COLOR_OFF, TextAlign::TOP_CENTER, "SLEEPING — PRESS TOP BUTTON TO WAKE");
       }

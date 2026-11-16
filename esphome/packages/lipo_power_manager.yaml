@@ -154,6 +154,12 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  # True right before entering Deep Sleep so the UI renders the sleep/wake prompt
+  - id: is_going_to_sleep
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # PCF8563 RTC-backed cumulative elapsed time (seconds) spent in each power mode
   # Persisted across Deep Sleep cycles; resets when a new USB-C charge cycle completes.
   - id: mode_0_sec
@@ -298,12 +304,9 @@ script:
           then:
             - logger.log: "OTA active or Stay-Awake lock is ON — skipping Deep Sleep"
           else:
-            - logger.log: "Entering Touch-Armed Deep Sleep (GPIO21 Wake + 15m Timer)"
-            - if:
-                condition:
-                  lambda: 'return !id(session_refreshed);'
-                then:
-                  - component.update: epaper_display
+            - logger.log: "Rendering sleep wake-hint overlay and entering Touch-Armed Deep Sleep (GPIO21 Wake + 15m Timer)"
+            - lambda: 'id(is_going_to_sleep) = true;'
+            - component.update: epaper_display
             - delay: 1000ms
             - lambda: |-
                 gpio_set_direction(GPIO_NUM_21, GPIO_MODE_INPUT);
