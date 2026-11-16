@@ -1,0 +1,80 @@
+# ==============================================================================
+# Remote Git Package Entrypoint — Bedroom Controller (lilygo-t5-bedroom)
+# ==============================================================================
+# Lives in `esphome/bedroom_package.yaml` on GitHub alongside `remote_package.yaml`
+# so your local `/config/esphome/lilygo-t5-bedroom.yaml` in Home Assistant only
+# needs the 6-line GitHub `packages:` stub (with `refresh: 0s`).
+#
+# Inherits ALL hardware drivers, fonts, LiPo power management, and the shared
+# Weather, Climate, and Power tabs from `remote_package.yaml`, overriding ONLY:
+#   1. Device identity & static IP (`!secret bedroom_static_ip`)
+#   2. Bedroom Home Assistant helper entities (`lilygo_t5_bedroom_*`)
+#   3. Tab 0 (Controls) — 6 Bedroom buttons
+# ==============================================================================
+
+substitutions:
+  # ----------------------------------------------------------------------------
+  # 1. Device Identity & Network Settings
+  # ----------------------------------------------------------------------------
+  device_name: "lilygo-t5-bedroom"
+  friendly_name: "LilyGo T5 Bedroom Dashboard"
+  static_ip: !secret bedroom_static_ip
+
+  # ----------------------------------------------------------------------------
+  # 2. Bedroom Companion Helper Entities
+  #    (defined in homeassistant/packages/lilygo_t5_dashboard.yaml)
+  # ----------------------------------------------------------------------------
+  entity_stay_awake_ota: "input_boolean.lilygo_t5_bedroom_stay_awake_ota"
+  entity_power_profile: "input_select.lilygo_t5_bedroom_power_profile"
+  entity_quiet_start: "input_number.lilygo_t5_bedroom_quiet_hours_start"
+  entity_quiet_end: "input_number.lilygo_t5_bedroom_quiet_hours_end"
+
+  # ----------------------------------------------------------------------------
+  # 3. Tab 0: Bedroom Smart Home Touch Controls (2x3)
+  #    Edit these in GitHub (and re-install wirelessly with `refresh: 0s`) to
+  #    customize your Bedroom buttons while keeping Weather, Climate & Power
+  #    identical to the Living Room controller!
+  #
+  #    type_ctrl_N:
+  #      "toggle" -> tap calls homeassistant.toggle; card shows ON / OFF
+  #      "scene"  -> tap calls homeassistant.turn_on; card shows ACTIVE /
+  #                  TAP TO RUN, and only one "scene" card is ACTIVE at a time
+  # ----------------------------------------------------------------------------
+  # Card 1 (Row 1, Col 1)
+  entity_ctrl_1: "light.bedroom_lights"
+  label_ctrl_1: "Bedroom Lights"
+  type_ctrl_1: "toggle"
+  subtitle_ctrl_1: "Main Bedroom Lights"
+
+  # Card 2 (Row 1, Col 2)
+  entity_ctrl_2: "light.bedside_lamp_left"
+  label_ctrl_2: "Left Bedside"
+  type_ctrl_2: "toggle"
+  subtitle_ctrl_2: "Bedside Lamp"
+
+  # Card 3 (Row 1, Col 3)
+  entity_ctrl_3: "light.bedside_lamp_right"
+  label_ctrl_3: "Right Bedside"
+  type_ctrl_3: "toggle"
+  subtitle_ctrl_3: "Bedside Lamp"
+
+  # Card 4 (Row 2, Col 1)
+  entity_ctrl_4: "fan.bedroom_ceiling_fan"
+  label_ctrl_4: "Ceiling Fan"
+  type_ctrl_4: "toggle"
+  subtitle_ctrl_4: "Bedroom Fan"
+
+  # Card 5 (Row 2, Col 2)
+  entity_ctrl_5: "scene.bedroom_relax"
+  label_ctrl_5: "Evening Relax"
+  type_ctrl_5: "scene"
+  subtitle_ctrl_5: "Bedroom Scene"
+
+  # Card 6 (Row 2, Col 3)
+  entity_ctrl_6: "scene.bed_time"
+  label_ctrl_6: "Goodnight"
+  type_ctrl_6: "scene"
+  subtitle_ctrl_6: "Whole-Home Scene"
+
+packages:
+  base_dashboard: !include remote_package.yaml

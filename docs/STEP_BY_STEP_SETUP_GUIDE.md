@@ -272,13 +272,13 @@ Here is the foolproof 3-step routine for wireless OTA updates on battery:
 
 ## Part 6: Adding a Second Controller (e.g., Bedroom Dashboard)
 
-Want a second panel in another room? You don't need to copy the whole firmware. The Bedroom panel pulls the shared `esphome/remote_package.yaml` (with `refresh: 0s`, so it always fetches the latest version), which gives it the **Weather, Climate, and Power tabs automatically**. Only **Tab 0 (Controls)** is customized, in `esphome/devices/bedroom-dashboard.yaml`.
+Want a second panel in another room? Just like your Living Room device pulls `esphome/remote_package.yaml` directly from GitHub, your Bedroom panel pulls **`esphome/bedroom_package.yaml`** directly from GitHub (`refresh: 0s`). Both the Bedroom buttons and the shared **Weather, Climate, and Power** tabs live in GitHub, so your local file in Home Assistant is just a 6-line `packages:` block!
 
 ### Step 6.1: Add a Unique Static IP to `/config/esphome/secrets.yaml`
 Open `/config/esphome/secrets.yaml` and add one new line. Pick an **unused** IP address on your router's subnet so it never collides with the Living Room panel (`static_ip`):
 
 ```yaml
-bedroom_static_ip: "192.168.1.xxx"   # replace xxx with a free address, e.g. 186
+bedroom_static_ip: "192.168.1.xxx"   # replace xxx with a free address, e.g. 62
 ```
 
 > [!TIP]
@@ -289,10 +289,17 @@ bedroom_static_ip: "192.168.1.xxx"   # replace xxx with a free address, e.g. 186
 2. Go to *Developer Tools $\rightarrow$ YAML*, click **Check Configuration**, then reload **Input Booleans**, **Input Selects**, **Input Numbers**, and **Automations** (or restart Home Assistant).
 3. Confirm the new helpers exist under *Settings $\rightarrow$ Devices & Services $\rightarrow$ Helpers*: `lilygo_t5_bedroom_stay_awake_ota`, `lilygo_t5_bedroom_power_profile`, `lilygo_t5_bedroom_quiet_hours_start`, and `lilygo_t5_bedroom_quiet_hours_end`.
 
-### Step 6.3: Create the Bedroom Device in ESPHome (`/config/esphome/lilygo-t5-bedroom.yaml`)
-1. Open the **ESPHome** dashboard in Home Assistant, click **+ New Device** $\rightarrow$ **Continue**, name it **`lilygo-t5-bedroom`**, select **ESP32-S3** (or **Skip**), and open the newly created `/config/esphome/lilygo-t5-bedroom.yaml` editor (or copy `esphome/devices/bedroom-dashboard.yaml` directly to **`/config/esphome/lilygo-t5-bedroom.yaml`** in the root of `/config/esphome/` so it shares `/config/esphome/secrets.yaml`).
-2. Replace the file contents with `esphome/devices/bedroom-dashboard.yaml`. Because it pulls `esphome/remote_package.yaml` directly from GitHub (`refresh: 0s`), you do not need to copy any extra header or package files.
-3. Edit only the 6 Bedroom entity IDs, labels, and card types (`"toggle"` vs `"scene"`) under `substitutions:` to match your bedroom lights, fan, switches, and scenes. Weather, Climate, and Power tabs are inherited automatically.
+### Step 6.3: Create `/config/esphome/lilygo-t5-bedroom.yaml` (6-Line GitHub Pull)
+1. Open the **ESPHome** dashboard in Home Assistant, click **+ New Device** $\rightarrow$ **Continue**, name it **`lilygo-t5-bedroom`**, select **ESP32-S3** (or **Skip**), and replace `/config/esphome/lilygo-t5-bedroom.yaml` with this 6-line GitHub package block (also saved at `esphome/devices/bedroom-dashboard.yaml`):
+   ```yaml
+   packages:
+     dashboard:
+       url: https://github.com/kessellrun/lilygo-t5-ha-dashboard
+       ref: main
+       files: [esphome/bedroom_package.yaml]
+       refresh: 0s
+   ```
+2. Customize your 6 Bedroom Tab 0 buttons in `esphome/bedroom_package.yaml` in GitHub (and push to `main`). Because `esphome/bedroom_package.yaml` includes `remote_package.yaml`, Weather, Climate, and Power tabs always stay identical to your Living Room device!
 
 ### Step 6.4: First-Time USB Flash, Adopt, and Allow Actions
 1. Click **Install $\rightarrow$ Manual download $\rightarrow$ Factory format**, then plug the Bedroom LilyGo T5 into your computer via USB-C.

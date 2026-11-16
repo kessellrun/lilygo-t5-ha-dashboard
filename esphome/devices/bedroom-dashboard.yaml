@@ -1,101 +1,20 @@
 # ==============================================================================
-# LilyGo T5 4.7" [H716] — Bedroom Dashboard (2nd Controller)
+# Local ESPHome Stub for `/config/esphome/lilygo-t5-bedroom.yaml`
 # ==============================================================================
-# This device reuses the shared, self-contained firmware published in the
-# GitHub repository via ESPHome's remote `packages:` feature. Everything
-# (hardware, LiPo power manager, touch navigation, fonts, and the 4-Tab
-# 960x540 UI renderer) is inherited from `esphome/remote_package.yaml`.
+# Paste just this file into `/config/esphome/lilygo-t5-bedroom.yaml` inside your
+# Home Assistant ESPHome dashboard (same pattern as your Living Room device!).
 #
-# Only the values under `substitutions:` below are overridden for the Bedroom:
-#   * Device identity (device_name / friendly_name)
-#   * A unique static IP (add `bedroom_static_ip` to your secrets.yaml)
-#   * Bedroom-specific Home Assistant helper entities (power profile, OTA, quiet hours)
-#   * Tab 0 (Controls) — 6 Bedroom cards
+# All Bedroom entities, labels, and shared Weather / Climate / Power tabs are
+# pulled automatically from `esphome/bedroom_package.yaml` on GitHub on every
+# build (`refresh: 0s`).
 #
-# Tab 1 (Weather), Tab 2 (Climate) and Tab 3 (Power) are inherited
-# automatically from `remote_package.yaml` and behave identically to the
-# Living Room panel. To customize them, copy the corresponding substitutions
-# (e.g. entity_weather, entity_room1_temp, label_room1, entity_hvac, ...) from
-# `remote_package.yaml` into the `substitutions:` block below and edit them.
-#
-# Required secrets.yaml entries (shared with the Living Room panel):
-#   wifi_ssid, wifi_password, gateway_ip, subnet_mask, dns_ip,
-#   api_encryption_key, ota_password
-# New secrets.yaml entry for this device (must be a free, unique address):
+# Prerequisite in `/config/esphome/secrets.yaml`:
 #   bedroom_static_ip: "192.168.1.xxx"
 # ==============================================================================
 
-substitutions:
-  # ----------------------------------------------------------------------------
-  # 1. Device Identity & Network Settings
-  # ----------------------------------------------------------------------------
-  device_name: "lilygo-t5-bedroom"
-  friendly_name: "LilyGo T5 Bedroom Dashboard"
-  static_ip: !secret bedroom_static_ip
-
-  # ----------------------------------------------------------------------------
-  # 2. Bedroom Companion Helper Entities
-  #    (defined in homeassistant/packages/lilygo_t5_dashboard.yaml)
-  # ----------------------------------------------------------------------------
-  entity_stay_awake_ota: "input_boolean.lilygo_t5_bedroom_stay_awake_ota"
-  entity_power_profile: "input_select.lilygo_t5_bedroom_power_profile"
-  entity_quiet_start: "input_number.lilygo_t5_bedroom_quiet_hours_start"
-  entity_quiet_end: "input_number.lilygo_t5_bedroom_quiet_hours_end"
-
-  # ----------------------------------------------------------------------------
-  # 3. Tab 0: Bedroom Smart Home Touch Controls (2x3)
-  #    Placeholder entity IDs — replace them with your own Bedroom entities.
-  #
-  #    type_ctrl_N:
-  #      "toggle" -> tap calls homeassistant.toggle; card shows ON / OFF
-  #      "scene"  -> tap calls homeassistant.turn_on; card shows ACTIVE /
-  #                  TAP TO RUN, and only one "scene" card is ACTIVE at a time
-  #    subtitle_ctrl_N: small caption rendered under the card title
-  # ----------------------------------------------------------------------------
-  # Card 1 (Row 1, Col 1)
-  entity_ctrl_1: "light.bedroom_lights"
-  label_ctrl_1: "Bedroom Lights"
-  type_ctrl_1: "toggle"
-  subtitle_ctrl_1: "Main Bedroom Lights"
-
-  # Card 2 (Row 1, Col 2)
-  entity_ctrl_2: "light.bedside_lamp_left"
-  label_ctrl_2: "Left Bedside"
-  type_ctrl_2: "toggle"
-  subtitle_ctrl_2: "Bedside Lamp"
-
-  # Card 3 (Row 1, Col 3)
-  entity_ctrl_3: "light.bedside_lamp_right"
-  label_ctrl_3: "Right Bedside"
-  type_ctrl_3: "toggle"
-  subtitle_ctrl_3: "Bedside Lamp"
-
-  # Card 4 (Row 2, Col 1)
-  entity_ctrl_4: "fan.bedroom_ceiling_fan"
-  label_ctrl_4: "Ceiling Fan"
-  type_ctrl_4: "toggle"
-  subtitle_ctrl_4: "Bedroom Fan"
-
-  # Card 5 (Row 2, Col 2)
-  entity_ctrl_5: "scene.bedroom_relax"
-  label_ctrl_5: "Evening Relax"
-  type_ctrl_5: "scene"
-  subtitle_ctrl_5: "Bedroom Scene"
-
-  # Card 6 (Row 2, Col 3)
-  entity_ctrl_6: "scene.bed_time"
-  label_ctrl_6: "Goodnight"
-  type_ctrl_6: "scene"
-  subtitle_ctrl_6: "Whole-Home Scene"
-
-# ==============================================================================
-# Shared Firmware — pulled from GitHub (Weather, Climate & Power tabs included)
-# ==============================================================================
-# `refresh: 0s` makes ESPHome fetch the latest `main` branch on every build so
-# both the Living Room and Bedroom panels stay in sync with repository updates.
 packages:
-  lilygo_t5_dashboard:
+  dashboard:
     url: https://github.com/kessellrun/lilygo-t5-ha-dashboard
     ref: main
-    files: [esphome/remote_package.yaml]
+    files: [esphome/bedroom_package.yaml]
     refresh: 0s
