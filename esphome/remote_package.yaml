@@ -140,37 +140,37 @@ font:
   - file: "fonts/Roboto-Regular.ttf"
     id: font_regular_14
     size: 14
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Bold.ttf"
     id: font_bold_14
     size: 14
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Regular.ttf"
     id: font_regular_18
     size: 18
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Bold.ttf"
     id: font_bold_18
     size: 18
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Bold.ttf"
     id: font_bold_24
     size: 24
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Bold.ttf"
     id: font_bold_36
     size: 36
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/Roboto-Bold.ttf"
     id: font_bold_48
     size: 48
-    glyphs: ' !"#&%()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|~•°'
+    glyphs: " !\"#&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~•°%"
 
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: font_mdi_22

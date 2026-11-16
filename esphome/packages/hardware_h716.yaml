@@ -18,6 +18,8 @@ esp32:
   flash_size: 16MB
   framework:
     type: arduino
+    advanced:
+      flash_chip: gd
 
 psram:
   mode: octal

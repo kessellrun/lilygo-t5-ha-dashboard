@@ -201,6 +201,20 @@ text_sensor:
     icon: "mdi:power-sleep"
     update_interval: never
 
+  # Raw text subscription for HVAC target temperature (avoids "Can't convert 'None' to number!" when off/auto)
+  - platform: homeassistant
+    id: ha_hvac_target_temp_raw
+    entity_id: ${entity_hvac}
+    attribute: temperature
+    on_value:
+      then:
+        - component.update: ha_hvac_target_temp
+        - if:
+            condition:
+              lambda: 'return id(active_tab) == 2;'
+            then:
+              - script.execute: request_screen_refresh
+
 # ==============================================================================
 # 3. Numeric Sensors — Weather Metrics, 4-Room Climate Matrix, Air Quality & System
 # ==============================================================================
@@ -283,17 +297,15 @@ sensor:
     entity_id: ${entity_hvac}
     attribute: current_temperature
 
-  - platform: homeassistant
+  - platform: template
     id: ha_hvac_target_temp
-    entity_id: ${entity_hvac}
-    attribute: temperature
-    on_value:
-      then:
-        - if:
-            condition:
-              lambda: 'return id(active_tab) == 2;'
-            then:
-              - script.execute: request_screen_refresh
+    update_interval: never
+    lambda: |-
+      std::string raw = id(ha_hvac_target_temp_raw).state;
+      if (raw.empty() || raw == "None" || raw == "null" || raw == "unknown" || raw == "unavailable") {
+        return NAN;
+      }
+      return atof(raw.c_str());
 
   # --- Tab 3: Companion Power Management Helpers & On-Device Diagnostics ---
   - platform: homeassistant
