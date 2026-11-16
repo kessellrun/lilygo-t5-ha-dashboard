@@ -41,34 +41,34 @@ substitutions:
   #                  TAP TO RUN, and only one "scene" card is ACTIVE at a time
   # ----------------------------------------------------------------------------
   # Card 1 (Row 1, Col 1)
-  entity_ctrl_1: "light.bedroom_lights"
-  label_ctrl_1: "Bedroom Lights"
+  entity_ctrl_1: "light.h6076"
+  label_ctrl_1: "Corner Light"
   type_ctrl_1: "toggle"
-  subtitle_ctrl_1: "Main Bedroom Lights"
+  subtitle_ctrl_1: "Bed Light"
 
   # Card 2 (Row 1, Col 2)
-  entity_ctrl_2: "light.bedside_lamp_left"
-  label_ctrl_2: "Left Bedside"
+  entity_ctrl_2: "light.bathroom_bathroom_light_strip"
+  label_ctrl_2: "Bathroom Light"
   type_ctrl_2: "toggle"
-  subtitle_ctrl_2: "Bedside Lamp"
+  subtitle_ctrl_2: "Indoor Light Strip"
 
   # Card 3 (Row 1, Col 3)
-  entity_ctrl_3: "light.bedside_lamp_right"
-  label_ctrl_3: "Right Bedside"
+  entity_ctrl_3: "switch.decent_espresso_de1pro_de1_on"
+  label_ctrl_3: "Espresso Machine"
   type_ctrl_3: "toggle"
-  subtitle_ctrl_3: "Bedside Lamp"
+  subtitle_ctrl_3: "De1+ On/Off"
 
   # Card 4 (Row 2, Col 1)
-  entity_ctrl_4: "fan.bedroom_ceiling_fan"
-  label_ctrl_4: "Ceiling Fan"
+  entity_ctrl_4: "light.hallway_lights"
+  label_ctrl_4: "Hallway Light"
   type_ctrl_4: "toggle"
-  subtitle_ctrl_4: "Bedroom Fan"
+  subtitle_ctrl_4: "Light toggle"
 
   # Card 5 (Row 2, Col 2)
-  entity_ctrl_5: "scene.bedroom_relax"
-  label_ctrl_5: "Evening Relax"
+  entity_ctrl_5: "scene.vr"
+  label_ctrl_5: "VR Lights"
   type_ctrl_5: "scene"
-  subtitle_ctrl_5: "Bedroom Scene"
+  subtitle_ctrl_5: "Bedroom VR Scene"
 
   # Card 6 (Row 2, Col 3)
   entity_ctrl_6: "scene.bed_time"
