@@ -128,14 +128,17 @@ esphome:
           if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 || cause == ESP_SLEEP_WAKEUP_GPIO) {
             id(wake_reason_text).publish_state("GPIO21 Wake Button");
             id(is_timer_wake) = false;
+            id(is_cold_boot) = false;
             id(last_touch_ms) = millis();
           } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
             id(wake_reason_text).publish_state("PCF8563 / 15m Timer");
             id(is_timer_wake) = true;
+            id(is_cold_boot) = false;
             id(last_touch_ms) = 0;
           } else {
             id(wake_reason_text).publish_state("Cold Boot / USB Reset");
             id(is_timer_wake) = false;
+            id(is_cold_boot) = true;
             id(last_touch_ms) = millis();
           }
           id(lipo_voltage).update();
@@ -171,8 +174,12 @@ ota:
     password: !secret ota_password
     on_begin:
       then:
-        - logger.log: "OTA Firmware Update Started — preventing Deep Sleep"
+        - lambda: 'id(ota_in_progress) = true;'
+        - logger.log: "OTA Firmware Update Started — locking out Deep Sleep"
         - deep_sleep.prevent: deep_sleep_ctrl
+    on_error:
+      then:
+        - lambda: 'id(ota_in_progress) = false;'
 
 # ==============================================================================
 # Typography & Material Design Icons (Place .ttf files in esphome/fonts/)

@@ -135,11 +135,45 @@ globals:
     restore_value: false
     initial_value: 'true'
 
+  # True when booted via physical RST button or USB power (gives 120s OTA grace window)
+  - id: is_cold_boot
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  # True while an ESPHome wireless OTA firmware upload is actively in progress
+  - id: ota_in_progress
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # Tracks whether the E-Paper display has already been refreshed this session
   - id: session_refreshed
     type: bool
     restore_value: false
     initial_value: 'false'
+
+  # PCF8563 RTC-backed cumulative elapsed time (seconds) spent in each power mode
+  # Persisted across Deep Sleep cycles; resets when a new USB-C charge cycle completes.
+  - id: mode_0_sec
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+
+  - id: mode_1_sec
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+
+  - id: mode_2_sec
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+
+  - id: last_mode_epoch
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
 
 # ==============================================================================
 # 1S LiPo Voltage ADC (GPIO14) & 11-Point Non-Linear Discharge Curve Lookup
@@ -259,9 +293,9 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(ha_stay_awake_ota).state;'
+            lambda: 'return id(ha_stay_awake_ota).state || id(ota_in_progress);'
           then:
-            - logger.log: "Stay-Awake OTA lock is ON in Home Assistant — skipping Deep Sleep"
+            - logger.log: "OTA active or Stay-Awake lock is ON — skipping Deep Sleep"
           else:
             - logger.log: "Entering Touch-Armed Deep Sleep (GPIO16 EXT0 / GPIO21 Wake + 15m Timer)"
             - if:
@@ -283,6 +317,28 @@ script:
           float v_crit = atof("${vbat_critical}");
           float soc_thresh = atof("${hybrid_sleep_soc_threshold}");
 
+          // 0. Accrue real wall-clock elapsed time per power mode via PCF8563 RTC
+          auto rtc_now = id(rtc_time).now();
+          if (rtc_now.is_valid() && rtc_now.timestamp > 1700000000UL) {
+            uint32_t cur_ep = (uint32_t)rtc_now.timestamp;
+            if (id(last_mode_epoch) > 1700000000UL && cur_ep > id(last_mode_epoch)) {
+              uint32_t dt = cur_ep - id(last_mode_epoch);
+              if (dt <= 86400UL) {
+                if (id(power_mode_index) == 0) id(mode_0_sec) += dt;
+                else if (id(power_mode_index) == 1) id(mode_1_sec) += dt;
+                else id(mode_2_sec) += dt;
+              }
+            }
+            id(last_mode_epoch) = cur_ep;
+          }
+
+          // Reset per-mode discharge timers when battery is charged near full on USB-C
+          if (id(is_charging_state) && !isnan(vbat) && vbat >= 4.15f) {
+            id(mode_0_sec) = 0;
+            id(mode_1_sec) = 0;
+            id(mode_2_sec) = 0;
+          }
+
           // 1. Critical Low-Battery Hardware Protection (< 3.32V)
           // Renders the Critical Hibernate lock screen and sleeps indefinitely
           if (!isnan(vbat) && vbat > 2.0f && vbat < v_crit && !id(lipo_charging).state) {
@@ -293,8 +349,8 @@ script:
             return;
           }
 
-          // 2. Respect Home Assistant OTA Stay-Awake Lock
-          if (id(ha_stay_awake_ota).state) {
+          // 2. Respect Active OTA Upload or Home Assistant OTA Stay-Awake Lock
+          if (id(ota_in_progress) || id(ha_stay_awake_ota).state) {
             id(deep_sleep_ctrl).prevent_deep_sleep();
             return;
           }
@@ -305,8 +361,12 @@ script:
           }
 
           // 4. Respect Awake Window:
+          //    - Physical RST / Cold Boot: 120s grace window so ESPHome can compile & upload OTA
           //    - Untouched 15m timer wake: brief sync window (${timer_wake_sync_sec} = 12s)
           //    - Interactive touch/button wake: 30s in Max Battery (Mode 2), 90s in Adaptive Hybrid (Mode 1)
+          if (id(is_cold_boot) && millis() < 120000UL) {
+            return;
+          }
           if (id(is_timer_wake)) {
             uint32_t sync_limit_ms = (uint32_t)(atoi("${timer_wake_sync_sec}")) * 1000UL;
             if (millis() < sync_limit_ms) {
@@ -330,9 +390,8 @@ script:
 
           // 6. Mode 1: Adaptive Hybrid — Check Quiet Hours (23:00..06:00) & SoC Threshold
           bool in_quiet_hours = false;
-          auto now = id(rtc_time).now();
-          if (now.is_valid()) {
-            int hr = now.hour;
+          if (rtc_now.is_valid()) {
+            int hr = rtc_now.hour;
             int q_start = !isnan(id(ha_quiet_start).state)
                 ? (int)id(ha_quiet_start).state
                 : atoi("${quiet_start_hour}");

@@ -582,10 +582,10 @@ inline void render_tab_power(esphome::display::Display &it) {
               "%.2fV (%.0f%%)", vbat, soc);
   }
 
-  // --- Right side inside card (x: 388..610, y: 192..365): Live Runtime Calculator by Mode ---
+  // --- Right side inside card (x: 388..610, y: 192..365): Recorded & Est. Runtime by Mode ---
   it.line(378, 194, 378, 372, esphome::display::COLOR_ON);
   it.printf(388, 192, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "RUNTIME @ %.0f%% SoC", soc);
+            "MODE TIME @ %.0f%% SoC", soc);
 
   float soc_frac = s_clamp / 100.0f;
   float hrs_mode0  = 120.0f * soc_frac;  // Full = 120h (5.0d) on 2500mAh 1S LiPo
@@ -595,24 +595,37 @@ inline void render_tab_power(esphome::display::Display &it) {
 
   char rt0_buf[24];
   if (hrs_mode0 < 48.0f) {
-    snprintf(rt0_buf, sizeof(rt0_buf), "%.0f hrs", hrs_mode0);
+    snprintf(rt0_buf, sizeof(rt0_buf), "Est %.0fh", hrs_mode0);
   } else {
-    snprintf(rt0_buf, sizeof(rt0_buf), "%.1f days", days_mode0);
+    snprintf(rt0_buf, sizeof(rt0_buf), "Est %.1fd", days_mode0);
   }
   char rt1_buf[24];
-  snprintf(rt1_buf, sizeof(rt1_buf), "%.0f days", days_mode1);
+  snprintf(rt1_buf, sizeof(rt1_buf), "Est %.0fd", days_mode1);
   char rt2_buf[24];
-  snprintf(rt2_buf, sizeof(rt2_buf), "%.0f days", days_mode2);
+  snprintf(rt2_buf, sizeof(rt2_buf), "Est %.0fd", days_mode2);
+
+  uint32_t rec_secs[3] = { id(mode_0_sec), id(mode_1_sec), id(mode_2_sec) };
+  char rec_bufs[3][28];
+  for (int m = 0; m < 3; m++) {
+    uint32_t s = rec_secs[m];
+    if (s < 3600UL) {
+      snprintf(rec_bufs[m], sizeof(rec_bufs[m]), "Rec: %lum", (unsigned long)(s / 60UL));
+    } else if (s < 172800UL) {
+      snprintf(rec_bufs[m], sizeof(rec_bufs[m]), "Rec: %.1fh", s / 3600.0f);
+    } else {
+      snprintf(rec_bufs[m], sizeof(rec_bufs[m]), "Rec: %.1fd", s / 86400.0f);
+    }
+  }
 
   struct RuntimeRow {
     const char *label;
     const char *val_str;
-    const char *avg_draw;
+    const char *rec_str;
   };
   RuntimeRow rows[3] = {
-    {"ALWAYS ONLINE",   rt0_buf, "~18mA"},
-    {"ADAPTIVE HYBRID", rt1_buf, "~1.2mA"},
-    {"MAX BATTERY",     rt2_buf, "~0.35mA"}
+    {"ALWAYS ONLINE",   rt0_buf, rec_bufs[0]},
+    {"ADAPTIVE HYBRID", rt1_buf, rec_bufs[1]},
+    {"MAX BATTERY",     rt2_buf, rec_bufs[2]}
   };
 
   for (int m = 0; m < 3; m++) {
@@ -622,17 +635,14 @@ inline void render_tab_power(esphome::display::Display &it) {
     it.print(607, ry, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, rows[m].val_str);
 
     // Mini progress bar scaled by current SoC
-    it.rectangle(388, ry + 20, 142, 10, esphome::display::COLOR_ON);
-    int mw = (int)(soc_frac * 138.0f);
+    it.rectangle(388, ry + 20, 120, 10, esphome::display::COLOR_ON);
+    int mw = (int)(soc_frac * 116.0f);
     if (mw > 0) {
       it.filled_rectangle(390, ry + 22, mw, 6, esphome::display::COLOR_ON);
     }
 
-    if (is_act) {
-      it.print(607, ry + 17, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, "[ACTIVE]");
-    } else {
-      it.print(607, ry + 17, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, rows[m].avg_draw);
-    }
+    it.print(607, ry + 17, is_act ? &id(font_bold_14) : &id(font_regular_14),
+             esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT, rows[m].rec_str);
   }
 
   // --- Bottom summary strip inside Left Card (y: 384..452) ---
