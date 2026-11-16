@@ -109,6 +109,27 @@ touchscreen:
             args: ['touch.x', 'touch.y']
 
 # ==============================================================================
+# Physical Side User Button (SENSOP_VN / GPIO21) — Resets Idle Timer When Awake
+# ==============================================================================
+binary_sensor:
+  - platform: gpio
+    id: side_wake_button
+    name: "SENSOP_VN Side Button (GPIO21)"
+    pin:
+      number: GPIO21
+      inverted: true
+      allow_other_uses: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      then:
+        - lambda: |-
+            id(is_timer_wake) = false;
+            id(last_touch_ms) = millis();
+        - logger.log: "SENSOP_VN (GPIO21) pressed"
+
+# ==============================================================================
 # OPTIONAL: Local Room Sensor on the H716 40-Pin Non-Soldered Female Header
 # Wire 3.3V, GND, SDA (GPIO17), and SCL (GPIO18) on the female header to a
 # BME280 or SHT4x breakout board and uncomment the block below.
