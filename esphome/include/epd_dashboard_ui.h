@@ -489,7 +489,7 @@ inline void render_tab_power(esphome::display::Display &it) {
   static const ModeCard kModes[3] = {
     { 20, 0, "1. ALWAYS ONLINE",   "Modem Sleep • Use for OTA"},
     {335, 1, "2. ADAPTIVE HYBRID", "Day Live • Night/Low Sleep"},
-    {650, 2, "3. MAX BATTERY",     "15m Timer + Touch Wake"}
+    {650, 2, "3. MAX BATTERY",     "15m Timer + IO21 Btn Wake"}
   };
 
   for (int i = 0; i < 3; i++) {

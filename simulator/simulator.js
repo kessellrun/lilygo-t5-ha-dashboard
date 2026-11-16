@@ -1330,7 +1330,7 @@
     const modeButtons = [
       { x: 20, idx: 0, title: "1. ALWAYS ONLINE", sub: "Modem Sleep • Use for OTA" },
       { x: 335, idx: 1, title: "2. ADAPTIVE HYBRID", sub: "Day Live • Night/Low Sleep" },
-      { x: 650, idx: 2, title: "3. MAX BATTERY", sub: "15m Timer + Touch Wake" }
+      { x: 650, idx: 2, title: "3. MAX BATTERY", sub: "15m Timer + IO21 Btn Wake" }
     ];
 
     modeButtons.forEach((btn) => {
