@@ -20,7 +20,8 @@ wifi:
   fast_connect: true
   power_save_mode: LIGHT
   manual_ip:
-    static_ip: !secret static_ip
+    # Per-device static IP via substitution (defaults to !secret static_ip)
+    static_ip: ${static_ip}
     gateway: !secret gateway_ip
     subnet: !secret subnet_mask
     dns1: !secret dns_ip

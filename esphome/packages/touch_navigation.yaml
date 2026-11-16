@@ -150,15 +150,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: |-
-                  id(ctrl_1_state) = true;
-                  id(ctrl_3_state) = false;
-                  id(ctrl_6_state) = false;
-              - homeassistant.service:
-                  service: homeassistant.turn_on
-                  data:
-                    entity_id: ${entity_ctrl_1}
-              - script.execute: request_screen_refresh
+              # Slot 1: behaviour selected at compile time by ${type_ctrl_1}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_1}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_1_state) = true;
+                        if (std::string("${type_ctrl_2}") == "scene") id(ctrl_2_state) = false;
+                        if (std::string("${type_ctrl_3}") == "scene") id(ctrl_3_state) = false;
+                        if (std::string("${type_ctrl_4}") == "scene") id(ctrl_4_state) = false;
+                        if (std::string("${type_ctrl_5}") == "scene") id(ctrl_5_state) = false;
+                        if (std::string("${type_ctrl_6}") == "scene") id(ctrl_6_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_1}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_1_state) = !id(ctrl_1_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_1}
+                    - script.execute: request_screen_refresh
 
   # --- Grid Zone 2: Row 1, Col 2 (x: 335..625, y: 75..245) ---
   - platform: touchscreen
@@ -176,12 +192,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_2_state) = !id(ctrl_2_state);'
-              - homeassistant.service:
-                  service: homeassistant.toggle
-                  data:
-                    entity_id: ${entity_ctrl_2}
-              - script.execute: request_screen_refresh
+              # Slot 2: behaviour selected at compile time by ${type_ctrl_2}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_2}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_2_state) = true;
+                        if (std::string("${type_ctrl_1}") == "scene") id(ctrl_1_state) = false;
+                        if (std::string("${type_ctrl_3}") == "scene") id(ctrl_3_state) = false;
+                        if (std::string("${type_ctrl_4}") == "scene") id(ctrl_4_state) = false;
+                        if (std::string("${type_ctrl_5}") == "scene") id(ctrl_5_state) = false;
+                        if (std::string("${type_ctrl_6}") == "scene") id(ctrl_6_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_2}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_2_state) = !id(ctrl_2_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_2}
+                    - script.execute: request_screen_refresh
 
   # --- Grid Zone 3: Row 1, Col 3 (x: 650..940, y: 75..245) ---
   - platform: touchscreen
@@ -199,15 +234,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: |-
-                  id(ctrl_1_state) = false;
-                  id(ctrl_3_state) = true;
-                  id(ctrl_6_state) = false;
-              - homeassistant.service:
-                  service: homeassistant.turn_on
-                  data:
-                    entity_id: ${entity_ctrl_3}
-              - script.execute: request_screen_refresh
+              # Slot 3: behaviour selected at compile time by ${type_ctrl_3}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_3}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_3_state) = true;
+                        if (std::string("${type_ctrl_1}") == "scene") id(ctrl_1_state) = false;
+                        if (std::string("${type_ctrl_2}") == "scene") id(ctrl_2_state) = false;
+                        if (std::string("${type_ctrl_4}") == "scene") id(ctrl_4_state) = false;
+                        if (std::string("${type_ctrl_5}") == "scene") id(ctrl_5_state) = false;
+                        if (std::string("${type_ctrl_6}") == "scene") id(ctrl_6_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_3}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_3_state) = !id(ctrl_3_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_3}
+                    - script.execute: request_screen_refresh
         - if:
             condition:
               lambda: 'return id(active_tab) == 2;'
@@ -239,12 +290,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_4_state) = !id(ctrl_4_state);'
-              - homeassistant.service:
-                  service: homeassistant.toggle
-                  data:
-                    entity_id: ${entity_ctrl_4}
-              - script.execute: request_screen_refresh
+              # Slot 4: behaviour selected at compile time by ${type_ctrl_4}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_4}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_4_state) = true;
+                        if (std::string("${type_ctrl_1}") == "scene") id(ctrl_1_state) = false;
+                        if (std::string("${type_ctrl_2}") == "scene") id(ctrl_2_state) = false;
+                        if (std::string("${type_ctrl_3}") == "scene") id(ctrl_3_state) = false;
+                        if (std::string("${type_ctrl_5}") == "scene") id(ctrl_5_state) = false;
+                        if (std::string("${type_ctrl_6}") == "scene") id(ctrl_6_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_4}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_4_state) = !id(ctrl_4_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_4}
+                    - script.execute: request_screen_refresh
 
   # --- Grid Zone 5: Row 2, Col 2 (x: 335..625, y: 265..435) ---
   - platform: touchscreen
@@ -262,12 +332,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: 'id(ctrl_5_state) = !id(ctrl_5_state);'
-              - homeassistant.service:
-                  service: homeassistant.toggle
-                  data:
-                    entity_id: ${entity_ctrl_5}
-              - script.execute: request_screen_refresh
+              # Slot 5: behaviour selected at compile time by ${type_ctrl_5}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_5}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_5_state) = true;
+                        if (std::string("${type_ctrl_1}") == "scene") id(ctrl_1_state) = false;
+                        if (std::string("${type_ctrl_2}") == "scene") id(ctrl_2_state) = false;
+                        if (std::string("${type_ctrl_3}") == "scene") id(ctrl_3_state) = false;
+                        if (std::string("${type_ctrl_4}") == "scene") id(ctrl_4_state) = false;
+                        if (std::string("${type_ctrl_6}") == "scene") id(ctrl_6_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_5}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_5_state) = !id(ctrl_5_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_5}
+                    - script.execute: request_screen_refresh
 
   # --- Grid Zone 6: Row 2, Col 3 (x: 650..940, y: 265..435) ---
   - platform: touchscreen
@@ -285,15 +374,31 @@ binary_sensor:
             condition:
               lambda: 'return id(active_tab) == 0;'
             then:
-              - lambda: |-
-                  id(ctrl_1_state) = false;
-                  id(ctrl_3_state) = false;
-                  id(ctrl_6_state) = true;
-              - homeassistant.service:
-                  service: homeassistant.turn_on
-                  data:
-                    entity_id: ${entity_ctrl_6}
-              - script.execute: request_screen_refresh
+              # Slot 6: behaviour selected at compile time by ${type_ctrl_6}
+              # ("scene" = turn_on + exclusive ACTIVE state, otherwise toggle)
+              - if:
+                  condition:
+                    lambda: 'return std::string("${type_ctrl_6}") == "scene";'
+                  then:
+                    - lambda: |-
+                        id(ctrl_6_state) = true;
+                        if (std::string("${type_ctrl_1}") == "scene") id(ctrl_1_state) = false;
+                        if (std::string("${type_ctrl_2}") == "scene") id(ctrl_2_state) = false;
+                        if (std::string("${type_ctrl_3}") == "scene") id(ctrl_3_state) = false;
+                        if (std::string("${type_ctrl_4}") == "scene") id(ctrl_4_state) = false;
+                        if (std::string("${type_ctrl_5}") == "scene") id(ctrl_5_state) = false;
+                    - homeassistant.service:
+                        service: homeassistant.turn_on
+                        data:
+                          entity_id: ${entity_ctrl_6}
+                    - script.execute: request_screen_refresh
+                  else:
+                    - lambda: 'id(ctrl_6_state) = !id(ctrl_6_state);'
+                    - homeassistant.service:
+                        service: homeassistant.toggle
+                        data:
+                          entity_id: ${entity_ctrl_6}
+                    - script.execute: request_screen_refresh
         - if:
             condition:
               lambda: 'return id(active_tab) == 2;'

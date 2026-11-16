@@ -90,7 +90,8 @@ class ProjectValidator:
         expected_files = [
             # Firmware files (Owner: @firmware)
             ("esphome/lilygo-t5-h716-dashboard.yaml", 500, "@firmware"),
-            ("esphome/secrets.yaml.example", 100, "@firmware"),
+            ("esphome/remote_package.yaml", 800, "@firmware"),
+            ("esphome/devices/bedroom-dashboard.yaml", 400, "@firmware"),
             ("esphome/fonts/README.md", 200, "@firmware"),
             ("esphome/packages/hardware_h716.yaml", 500, "@firmware"),
             ("esphome/packages/lipo_power_manager.yaml", 800, "@firmware"),
@@ -133,7 +134,8 @@ class ProjectValidator:
 
         yaml_files = [
             ("esphome/lilygo-t5-h716-dashboard.yaml", "@firmware"),
-            ("esphome/secrets.yaml.example", "@firmware"),
+            ("esphome/remote_package.yaml", "@firmware"),
+            ("esphome/devices/bedroom-dashboard.yaml", "@firmware"),
             ("esphome/packages/hardware_h716.yaml", "@firmware"),
             ("esphome/packages/lipo_power_manager.yaml", "@firmware"),
             ("esphome/packages/ha_entities.yaml", "@firmware"),

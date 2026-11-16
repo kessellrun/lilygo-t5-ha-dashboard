@@ -29,11 +29,20 @@
 #      - Sends persistent/mobile notifications at Low Battery (< 20% / < 3.68V)
 #        and Critical Hibernate (< 5% / < 3.32V), plus a 2-hour safety timeout
 #        for OTA Stay-Awake mode so your battery never drains accidentally.
+#   6. Bedroom Dashboard (`lilygo-t5-bedroom`) helpers & automations
+#      - Dedicated `lilygo_t5_bedroom_*` input_boolean / input_select /
+#        input_number helpers and 3 matching battery & OTA safety automations
+#        for a second controller (see docs/STEP_BY_STEP_SETUP_GUIDE.md Part 6).
 # ==============================================================================
 
 input_boolean:
   lilygo_t5_stay_awake_ota:
     name: "LilyGo T5 Stay Awake for OTA Update"
+    icon: mdi:cellphone-arrow-down
+
+  # Bedroom (lilygo-t5-bedroom)
+  lilygo_t5_bedroom_stay_awake_ota:
+    name: "LilyGo T5 Bedroom Stay Awake for OTA Update"
     icon: mdi:cellphone-arrow-down
 
 input_select:
@@ -43,6 +52,16 @@ input_select:
     # Default/recommended: "Adaptive Hybrid (Recommended)"
     # Note: `initial:` is intentionally omitted so Home Assistant preserves
     # your selected power profile across restarts and YAML reloads.
+    options:
+      - "Adaptive Hybrid (Recommended)"
+      - "Always Online (Modem Sleep)"
+      - "Max Battery (Deep Sleep + Touch Wake)"
+
+  # Bedroom (lilygo-t5-bedroom)
+  lilygo_t5_bedroom_power_profile:
+    name: "LilyGo T5 Bedroom LiPo Power Profile"
+    icon: mdi:battery-sync
+    # `initial:` intentionally omitted so Home Assistant preserves your selection.
     options:
       - "Adaptive Hybrid (Recommended)"
       - "Always Online (Modem Sleep)"
@@ -66,6 +85,27 @@ input_number:
     max: 23
     step: 1
     # Default: 6 (06:00 / 6:00 AM) — `initial:` omitted to persist user changes across restarts
+    mode: box
+    unit_of_measurement: "h"
+
+  # Bedroom (lilygo-t5-bedroom)
+  lilygo_t5_bedroom_quiet_hours_start:
+    name: "LilyGo T5 Bedroom Quiet Hours Start (24h)"
+    icon: mdi:weather-night
+    min: 0
+    max: 23
+    step: 1
+    # `initial:` omitted to persist user changes across restarts
+    mode: box
+    unit_of_measurement: "h"
+
+  lilygo_t5_bedroom_quiet_hours_end:
+    name: "LilyGo T5 Bedroom Quiet Hours End (24h)"
+    icon: mdi:weather-sunset-up
+    min: 0
+    max: 23
+    step: 1
+    # `initial:` omitted to persist user changes across restarts
     mode: box
     unit_of_measurement: "h"
 
@@ -194,5 +234,83 @@ automation:
           title: "LilyGo T5: OTA Stay-Awake Auto-Disabled"
           message: >-
             `input_boolean.lilygo_t5_stay_awake_ota` was automatically turned off after
+            2 hours to preserve your 1S LiPo battery.
+    mode: single
+
+  # ----------------------------------------------------------------------------
+  # BEDROOM (lilygo-t5-bedroom) BATTERY & OTA SAFETY AUTOMATIONS
+  # ----------------------------------------------------------------------------
+  - id: lilygo_t5_bedroom_low_battery_warning
+    alias: "LilyGo T5 Bedroom - Low LiPo Battery Warning (< 20% or < 3.68V)"
+    description: "Notifies when the Bedroom 1S LiPo battery drops below 20% SoC or 3.68V so you can plug in USB-C."
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_level
+        below: 20
+        for:
+          minutes: 5
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        below: 3.68
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: binary_sensor.lilygo_t5_bedroom_lipo_battery_charging
+        state: "off"
+    action:
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_bedroom_battery_warning"
+          title: "LilyGo T5 Bedroom E-Paper: Low LiPo Battery"
+          message: >-
+            The Bedroom LilyGo T5 4.7" E-Paper display battery is down to
+            {{ states('sensor.lilygo_t5_bedroom_lipo_battery_level') }}%
+            ({{ states('sensor.lilygo_t5_bedroom_lipo_battery_voltage') }}V).
+            Adaptive Hybrid mode has shifted the panel into Touch-Armed Deep Sleep
+            between 15-minute updates. Please recharge via USB-C soon.
+    mode: single
+
+  - id: lilygo_t5_bedroom_critical_battery_hibernate_alert
+    alias: "LilyGo T5 Bedroom - Critical LiPo Battery Hibernate Alert (< 5% or < 3.32V)"
+    description: "Urgent alert when the Bedroom 1S LiPo cell hits the 3.32V cutoff and the ESP32-S3 locks into Hibernate."
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_level
+        below: 5
+      - platform: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        below: 3.32
+    action:
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_bedroom_battery_critical"
+          title: "URGENT: LilyGo T5 Bedroom Entered Critical Battery Hibernate"
+          message: >-
+            The Bedroom LilyGo T5 4.7" LiPo cell reached {{ states('sensor.lilygo_t5_bedroom_lipo_battery_voltage') }}V
+            (below the 3.32V safety threshold). To protect the 1S LiPo pouch cell from
+            over-discharge damage, the display has rendered its low-battery lock screen
+            and entered indefinite deep sleep. Connect a USB-C cable to recharge and wake it.
+    mode: single
+
+  - id: lilygo_t5_bedroom_ota_stay_awake_safety_timeout
+    alias: "LilyGo T5 Bedroom - Auto-Disable Stay Awake OTA After 2 Hours"
+    description: "Prevents accidental Bedroom LiPo battery drain if Stay Awake for OTA is left enabled."
+    trigger:
+      - platform: state
+        entity_id: input_boolean.lilygo_t5_bedroom_stay_awake_ota
+        to: "on"
+        for:
+          hours: 2
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.lilygo_t5_bedroom_stay_awake_ota
+      - action: persistent_notification.create
+        data:
+          notification_id: "lilygo_t5_bedroom_ota_timeout"
+          title: "LilyGo T5 Bedroom: OTA Stay-Awake Auto-Disabled"
+          message: >-
+            `input_boolean.lilygo_t5_bedroom_stay_awake_ota` was automatically turned off after
             2 hours to preserve your 1S LiPo battery.
     mode: single

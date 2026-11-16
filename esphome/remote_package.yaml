@@ -9,6 +9,7 @@
 substitutions:
   device_name: "lilygo-t5-h716-dashboard"
   friendly_name: "LilyGo T5 4.7 E-Paper Dashboard"
+  static_ip: !secret static_ip
   use_imperial: "true"
   temp_unit: "°F"
   speed_unit: "mph"
@@ -25,23 +26,37 @@ substitutions:
   # ----------------------------------------------------------------------------
   # Tab 0: Smart Home Touch Controls (2x3)
   # ----------------------------------------------------------------------------
+  # type_ctrl_N: "scene" (turn_on, ACTIVE / TAP TO RUN, mutually exclusive)
+  #              or "toggle" (toggle, ON / OFF)
   entity_ctrl_1: "scene.living_room_tv"
   label_ctrl_1: "Living Room TV"
+  type_ctrl_1: "scene"
+  subtitle_ctrl_1: "Home Assistant Scene"
 
   entity_ctrl_2: "light.kitchen_lights"
   label_ctrl_2: "Kitchen Lights"
+  type_ctrl_2: "toggle"
+  subtitle_ctrl_2: "Smart Light Group"
 
   entity_ctrl_3: "scene.evening_lights"
   label_ctrl_3: "Evening Lights"
+  type_ctrl_3: "scene"
+  subtitle_ctrl_3: "Home Assistant Scene"
 
   entity_ctrl_4: "light.cync_indoor_light_strip_16ft_2"
   label_ctrl_4: "Bookshelf Lights"
+  type_ctrl_4: "toggle"
+  subtitle_ctrl_4: "Indoor Light Strip"
 
   entity_ctrl_5: "switch.living_room_light"
   label_ctrl_5: "Wave Light"
+  type_ctrl_5: "toggle"
+  subtitle_ctrl_5: "Smart Switch Control"
 
   entity_ctrl_6: "scene.bed_time"
   label_ctrl_6: "Goodnight"
+  type_ctrl_6: "scene"
+  subtitle_ctrl_6: "Whole-Home Scene"
 
   entity_stay_awake_ota: "input_boolean.lilygo_t5_stay_awake_ota"
   entity_power_profile: "input_select.lilygo_t5_power_profile"
@@ -399,13 +414,19 @@ display:
           bool state;
           const char *state_on_label; const char *state_off_label;
         };
+        // Per-card scene/toggle type (${type_ctrl_1..6}) drives ACTIVE / TAP TO RUN vs ON / OFF
+        const bool is_scene[6] = {
+          strcmp("${type_ctrl_1}", "scene") == 0, strcmp("${type_ctrl_2}", "scene") == 0,
+          strcmp("${type_ctrl_3}", "scene") == 0, strcmp("${type_ctrl_4}", "scene") == 0,
+          strcmp("${type_ctrl_5}", "scene") == 0, strcmp("${type_ctrl_6}", "scene") == 0
+        };
         ControlCard cards[6] = {
-          { 20,  75, "${label_ctrl_1}", "Home Assistant Scene", "\U000F07D0", "\U000F07D0", id(ctrl_1_state), "ACTIVE", "TAP TO RUN" },
-          {335,  75, "${label_ctrl_2}", "Smart Light Group",    "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
-          {650,  75, "${label_ctrl_3}", "Home Assistant Scene", "\U000F0335", "\U000F0336", id(ctrl_3_state), "ACTIVE", "TAP TO RUN" },
-          { 20, 265, "${label_ctrl_4}", "Indoor Light Strip",   "\U000F0335", "\U000F0336", id(ctrl_4_state), "ON",     "OFF" },
-          {335, 265, "${label_ctrl_5}", "Smart Switch Control", "\U000F0425", "\U000F0425", id(ctrl_5_state), "ON",     "OFF" },
-          {650, 265, "${label_ctrl_6}", "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
+          { 20,  75, "${label_ctrl_1}", "${subtitle_ctrl_1}", "\U000F07D0", "\U000F07D0", id(ctrl_1_state), is_scene[0] ? "ACTIVE" : "ON", is_scene[0] ? "TAP TO RUN" : "OFF" },
+          {335,  75, "${label_ctrl_2}", "${subtitle_ctrl_2}", "\U000F08DD", "\U000F0336", id(ctrl_2_state), is_scene[1] ? "ACTIVE" : "ON", is_scene[1] ? "TAP TO RUN" : "OFF" },
+          {650,  75, "${label_ctrl_3}", "${subtitle_ctrl_3}", "\U000F0335", "\U000F0336", id(ctrl_3_state), is_scene[2] ? "ACTIVE" : "ON", is_scene[2] ? "TAP TO RUN" : "OFF" },
+          { 20, 265, "${label_ctrl_4}", "${subtitle_ctrl_4}", "\U000F0335", "\U000F0336", id(ctrl_4_state), is_scene[3] ? "ACTIVE" : "ON", is_scene[3] ? "TAP TO RUN" : "OFF" },
+          {335, 265, "${label_ctrl_5}", "${subtitle_ctrl_5}", "\U000F0425", "\U000F0425", id(ctrl_5_state), is_scene[4] ? "ACTIVE" : "ON", is_scene[4] ? "TAP TO RUN" : "OFF" },
+          {650, 265, "${label_ctrl_6}", "${subtitle_ctrl_6}", "\U000F0594", "\U000F0594", id(ctrl_6_state), is_scene[5] ? "ACTIVE" : "ON", is_scene[5] ? "TAP TO RUN" : "OFF" }
         };
         int active_count = 0;
         for (int i = 0; i < 6; i++) {

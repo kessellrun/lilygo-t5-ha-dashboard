@@ -16,7 +16,11 @@ static constexpr int HEADER_H = 56;
 static constexpr int NAVBAR_Y = 476;
 static constexpr int NAVBAR_H = 64;
 
-// Dynamic labels passed from YAML substitutions (${label_ctrl_1..6}, ${label_room1..4})
+// Dynamic labels passed from YAML substitutions:
+//   ${label_ctrl_1..6}, ${label_room1..4}, ${subtitle_ctrl_1..6}, ${type_ctrl_1..6}
+// The sub_* / type_* fields use default member initializers matching the
+// original Living Room layout, so legacy 10-value aggregate initializers
+// ({ctrl_1..6, room_1..4}) remain fully backwards compatible.
 struct DashboardLabels {
   const char *ctrl_1;
   const char *ctrl_2;
@@ -28,7 +32,26 @@ struct DashboardLabels {
   const char *room_2;
   const char *room_3;
   const char *room_4;
+  // Tab 0 card subtitles (${subtitle_ctrl_1..6})
+  const char *sub_1 = "Home Assistant Scene";
+  const char *sub_2 = "Smart Light Group";
+  const char *sub_3 = "Home Assistant Scene";
+  const char *sub_4 = "Indoor Light Strip";
+  const char *sub_5 = "Smart Switch Control";
+  const char *sub_6 = "Whole-Home Scene";
+  // Tab 0 card types (${type_ctrl_1..6}): "scene" or "toggle"
+  const char *type_1 = "scene";
+  const char *type_2 = "toggle";
+  const char *type_3 = "scene";
+  const char *type_4 = "toggle";
+  const char *type_5 = "toggle";
+  const char *type_6 = "scene";
 };
+
+// Returns true when a Tab 0 card type string is "scene" (null-safe)
+inline bool is_scene_type(const char *type) {
+  return type != nullptr && strcmp(type, "scene") == 0;
+}
 
 // Helper to draw a thick-bordered card with optional inverted active state
 inline void draw_card(esphome::display::Display &it, int x, int y, int w, int h, bool inverted = false, int border_px = 2) {
@@ -227,13 +250,19 @@ inline void render_tab_controls(esphome::display::Display &it, const DashboardLa
     const char *state_off_label;
   };
 
+  // Per-card scene/toggle type drives the ACTIVE / TAP TO RUN vs ON / OFF labels
+  const bool is_scene[6] = {
+    is_scene_type(labels.type_1), is_scene_type(labels.type_2), is_scene_type(labels.type_3),
+    is_scene_type(labels.type_4), is_scene_type(labels.type_5), is_scene_type(labels.type_6)
+  };
+
   ControlCard cards[6] = {
-    { 20,  75, labels.ctrl_1, "Home Assistant Scene", "\U000F07D0", "\U000F07D0", id(ctrl_1_state), "ACTIVE", "TAP TO RUN" },
-    {335,  75, labels.ctrl_2, "Smart Light Group",    "\U000F08DD", "\U000F0336", id(ctrl_2_state), "ON",     "OFF" },
-    {650,  75, labels.ctrl_3, "Home Assistant Scene", "\U000F0335", "\U000F0336", id(ctrl_3_state), "ACTIVE", "TAP TO RUN" },
-    { 20, 265, labels.ctrl_4, "Indoor Light Strip",   "\U000F0335", "\U000F0336", id(ctrl_4_state), "ON",     "OFF" },
-    {335, 265, labels.ctrl_5, "Smart Switch Control", "\U000F0425", "\U000F0425", id(ctrl_5_state), "ON",     "OFF" },
-    {650, 265, labels.ctrl_6, "Whole-Home Scene",     "\U000F0594", "\U000F0594", id(ctrl_6_state), "ACTIVE", "TAP TO RUN" }
+    { 20,  75, labels.ctrl_1, labels.sub_1, "\U000F07D0", "\U000F07D0", id(ctrl_1_state), is_scene[0] ? "ACTIVE" : "ON", is_scene[0] ? "TAP TO RUN" : "OFF" },
+    {335,  75, labels.ctrl_2, labels.sub_2, "\U000F08DD", "\U000F0336", id(ctrl_2_state), is_scene[1] ? "ACTIVE" : "ON", is_scene[1] ? "TAP TO RUN" : "OFF" },
+    {650,  75, labels.ctrl_3, labels.sub_3, "\U000F0335", "\U000F0336", id(ctrl_3_state), is_scene[2] ? "ACTIVE" : "ON", is_scene[2] ? "TAP TO RUN" : "OFF" },
+    { 20, 265, labels.ctrl_4, labels.sub_4, "\U000F0335", "\U000F0336", id(ctrl_4_state), is_scene[3] ? "ACTIVE" : "ON", is_scene[3] ? "TAP TO RUN" : "OFF" },
+    {335, 265, labels.ctrl_5, labels.sub_5, "\U000F0425", "\U000F0425", id(ctrl_5_state), is_scene[4] ? "ACTIVE" : "ON", is_scene[4] ? "TAP TO RUN" : "OFF" },
+    {650, 265, labels.ctrl_6, labels.sub_6, "\U000F0594", "\U000F0594", id(ctrl_6_state), is_scene[5] ? "ACTIVE" : "ON", is_scene[5] ? "TAP TO RUN" : "OFF" }
   };
 
   int active_count = 0;
