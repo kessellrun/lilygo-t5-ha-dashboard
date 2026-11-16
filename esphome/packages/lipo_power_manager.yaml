@@ -37,7 +37,7 @@ deep_sleep:
     mode:
       input: true
       pullup: true
-  wakeup_pin_mode: INVERT_WAKEUP
+  wakeup_pin_mode: IGNORE
 
 # ==============================================================================
 # RTC-Backed Globals (Persisted across Deep Sleep Wake Cycles)
