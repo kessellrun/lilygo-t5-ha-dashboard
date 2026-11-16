@@ -361,7 +361,8 @@ display:
       it.print(318, 16, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, wifi_icon);
 
       const char *mode_label = "ADAPTIVE HYBRID";
-      if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
+      if (id(is_going_to_sleep)) mode_label = "SLEEPING";
+      else if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
       else if (id(power_mode_index) == 2) mode_label = "MAX BATTERY";
 
       draw_card(350, 12, 195, 32, false, 1);
@@ -376,11 +377,9 @@ display:
       it.printf(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
       if (id(is_going_to_sleep)) {
         it.filled_triangle(632, 1, 624, 10, 640, 10, COLOR_ON);
-        it.print(588, 33, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "SLEEPING • PRESS BTN");
-      } else {
-        it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
-                  chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
       }
+      it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
+                chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
 
       draw_card(740, 8, 105, 40, false, 2);
       it.print(752, 17, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
@@ -778,5 +777,5 @@ display:
       if (id(is_going_to_sleep)) {
         draw_card(452, 56, 360, 26, true, 1);
         it.filled_triangle(632, 48, 624, 56, 640, 56, COLOR_ON);
-        it.print(632, 62, id(font_bold_14), COLOR_OFF, TextAlign::TOP_CENTER, "SLEEPING — PRESS TOP BUTTON TO WAKE");
+        it.print(632, 62, id(font_bold_14), COLOR_OFF, TextAlign::TOP_CENTER, "SLEEPING • PRESS TOP BUTTON TO WAKE");
       }

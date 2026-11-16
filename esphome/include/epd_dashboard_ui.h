@@ -136,7 +136,8 @@ inline void render_header(esphome::display::Display &it) {
   it.print(318, 16, &id(font_mdi_22), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT, wifi_icon);
 
   const char *mode_label = "ADAPTIVE HYBRID";
-  if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
+  if (id(is_going_to_sleep)) mode_label = "SLEEPING";
+  else if (id(power_mode_index) == 0) mode_label = "ALWAYS ONLINE";
   else if (id(power_mode_index) == 2) mode_label = "MAX BATTERY";
 
   draw_card(it, 350, 12, 195, 32, false, 1);
@@ -155,12 +156,9 @@ inline void render_header(esphome::display::Display &it) {
   if (id(is_going_to_sleep)) {
     // Upward arrow pointing directly at the top-edge physical wake button above the dot (x=632)
     it.filled_triangle(632, 1, 624, 10, 640, 10, esphome::display::COLOR_ON);
-    it.print(588, 33, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-             "SLEEPING • PRESS BTN");
-  } else {
-    it.printf(588, 33, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-              "%s", chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
   }
+  it.printf(588, 33, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+            "%s", chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
 
   // Header Quick Button 1: [REFRESH] (x: 740..845, y: 8..48)
   draw_card(it, 740, 8, 105, 40, false, 2);
@@ -739,7 +737,7 @@ inline void render_dashboard(esphome::display::Display &it, const DashboardLabel
     draw_card(it, 452, 56, 360, 26, true, 1);
     it.filled_triangle(632, 48, 624, 56, 640, 56, esphome::display::COLOR_ON);
     it.print(632, 62, &id(font_bold_14), esphome::display::COLOR_OFF, esphome::display::TextAlign::TOP_CENTER,
-             "SLEEPING — PRESS TOP BUTTON TO WAKE");
+             "SLEEPING • PRESS TOP BUTTON TO WAKE");
   }
 }
 

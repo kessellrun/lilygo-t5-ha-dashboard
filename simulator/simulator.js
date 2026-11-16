@@ -1000,7 +1000,7 @@
 
     // Center (x: 318..545): Wi-Fi icon + sharp-bordered mode card (350, 12, 195, 32)
     drawWifiIcon(ctx, 318, 16, state.wifiRssi, !state.isSleeping, PALETTE.ink);
-    const modeLabel = POWER_MODES[state.powerModeIndex].label;
+    const modeLabel = state.isSleeping ? "SLEEPING" : POWER_MODES[state.powerModeIndex].label;
     drawCard(ctx, 350, 12, 195, 32, false, 1);
     ctx.fillStyle = PALETTE.ink;
     ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
@@ -1027,17 +1027,14 @@
       ctx.lineTo(640, 10);
       ctx.closePath();
       ctx.fill();
-      ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText("SLEEPING • PRESS BTN", 588, 33);
-    } else {
-      const batStatus = charging
-        ? "USB-C CHARGING"
-        : (state.powerModeIndex === 0 || state.stayAwakeOta)
-          ? "OTA / ALWAYS ON"
-          : "1S LIPO ACTIVE";
-      ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(batStatus, 588, 33);
     }
+    const batStatus = charging
+      ? "USB-C CHARGING"
+      : (state.powerModeIndex === 0 || state.stayAwakeOta)
+        ? "OTA / ALWAYS ON"
+        : "1S LIPO ACTIVE";
+    ctx.font = "400 14px 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(batStatus, 588, 33);
 
     // Header Quick Buttons (y: 8..48)
     // [CLEAN] x: 740..845, y: 8..48
@@ -1748,7 +1745,7 @@
         ctx.font = "700 14px 'Segoe UI', Roboto, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText("SLEEPING — PRESS TOP BUTTON TO WAKE", 632, 62);
+        ctx.fillText("SLEEPING • PRESS TOP BUTTON TO WAKE", 632, 62);
       }
     }
 
