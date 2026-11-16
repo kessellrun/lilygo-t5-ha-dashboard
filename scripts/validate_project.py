@@ -164,7 +164,20 @@ class ProjectValidator:
                 self.add_error("YAML Tab Indentation", f"{rel_path}:{line_no} contains tab indentation", owner)
                 return
 
-        # Try parsing using ruamel.yaml with custom node constructors
+        # Check for invalid ESPHome ${...} substitution syntax (e.g. ${foo..bar} in comments/lambdas)
+        if rel_path.startswith("esphome/"):
+            for line_no, line in enumerate(lines, 1):
+                if line.lstrip().startswith('#'):
+                    continue
+                for sub_m in re.finditer(r'\$\{([^}]+)\}', line):
+                    expr = sub_m.group(1).strip()
+                    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', expr):
+                        self.add_error(
+                            "ESPHome Substitution Syntax",
+                            f"{rel_path}:{line_no} contains invalid substitution expression '${{{expr}}}'",
+                            owner
+                        )
+                        return
         parsed = False
         try:
             from ruamel.yaml import YAML

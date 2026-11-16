@@ -17,7 +17,7 @@ static constexpr int NAVBAR_Y = 476;
 static constexpr int NAVBAR_H = 64;
 
 // Dynamic labels passed from YAML substitutions:
-//   ${label_ctrl_1..6}, ${label_room1..4}, ${subtitle_ctrl_1..6}, ${type_ctrl_1..6}
+//   label_ctrl_1..6, label_room1..4, subtitle_ctrl_1..6, type_ctrl_1..6
 // The sub_* / type_* fields use default member initializers matching the
 // original Living Room layout, so legacy 10-value aggregate initializers
 // ({ctrl_1..6, room_1..4}) remain fully backwards compatible.
@@ -32,14 +32,14 @@ struct DashboardLabels {
   const char *room_2;
   const char *room_3;
   const char *room_4;
-  // Tab 0 card subtitles (${subtitle_ctrl_1..6})
+  // Tab 0 card subtitles (subtitle_ctrl_1..6)
   const char *sub_1 = "Home Assistant Scene";
   const char *sub_2 = "Smart Light Group";
   const char *sub_3 = "Home Assistant Scene";
   const char *sub_4 = "Indoor Light Strip";
   const char *sub_5 = "Smart Switch Control";
   const char *sub_6 = "Whole-Home Scene";
-  // Tab 0 card types (${type_ctrl_1..6}): "scene" or "toggle"
+  // Tab 0 card types (type_ctrl_1..6): "scene" or "toggle"
   const char *type_1 = "scene";
   const char *type_2 = "toggle";
   const char *type_3 = "scene";

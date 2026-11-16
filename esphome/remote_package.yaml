@@ -414,7 +414,7 @@ display:
           bool state;
           const char *state_on_label; const char *state_off_label;
         };
-        // Per-card scene/toggle type (${type_ctrl_1..6}) drives ACTIVE / TAP TO RUN vs ON / OFF
+        // Per-card scene/toggle type (type_ctrl_1..6) drives ACTIVE / TAP TO RUN vs ON / OFF
         const bool is_scene[6] = {
           strcmp("${type_ctrl_1}", "scene") == 0, strcmp("${type_ctrl_2}", "scene") == 0,
           strcmp("${type_ctrl_3}", "scene") == 0, strcmp("${type_ctrl_4}", "scene") == 0,
