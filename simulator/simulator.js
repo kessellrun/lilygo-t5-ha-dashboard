@@ -203,7 +203,13 @@
   }
 
   function isChargingActive() {
-    return state.usbCharging || state.lipoVoltage > 4.22;
+    // USB-C VBUS present OR CV float >= 4.14V (matches firmware USB-C detection)
+    return state.usbCharging || state.lipoVoltage >= 4.14;
+  }
+
+  // Critical Hibernate is exempt on USB-C power, ALWAYS ONLINE profile, and OTA Stay-Awake.
+  function isCriticalExempt() {
+    return isChargingActive() || state.powerModeIndex === 0 || state.stayAwakeOta;
   }
 
   function formatTemp(tempF, decimals = 0) {
@@ -578,6 +584,10 @@
     state.lastStatusMessage = `Power Mode: ${mode.label}`;
     logEvent("power", "POWER", `global power_mode_index = ${index} (${mode.haName})`);
     logEvent("ha", "ESPHOME -> HA", `select.lilygo_t5_power_profile -> "${mode.haName}"`);
+    if (state.isCriticalHibernate && isCriticalExempt()) {
+      evaluateBatteryThresholds(state.lipoVoltage);
+      return;
+    }
     triggerPartialRefresh(region || { x: 315, y: 0, w: 240, h: 56 }, `Mode -> ${mode.label}`);
   }
 
@@ -617,14 +627,18 @@
     const v = state.lipoVoltage;
     const soc = computeLipoSoc(v);
     const wasCrit = state.isCriticalHibernate;
-    state.isCriticalHibernate = v < 3.32;
+    state.isCriticalHibernate = v < 3.32 && !isCriticalExempt();
 
     if (state.isCriticalHibernate && !wasCrit) {
       state.isSleeping = false;
       logEvent("crit", "CRITICAL", `ADC GPIO14 = ${v.toFixed(2)}V (< 3.32V)! Entering Critical LiPo Hibernation to prevent over-discharge.`);
       logEvent("ha", "HA ALERT", `Automation triggered: Critical Battery Hibernate Alert (${v.toFixed(2)}V / ${soc}%)`);
     } else if (!state.isCriticalHibernate && wasCrit) {
-      logEvent("power", "RECOVER", `LiPo recovered to ${v.toFixed(2)}V (${soc}%). Exiting Critical Hibernate.`);
+      let why = `LiPo recovered to ${v.toFixed(2)}V (${soc}%)`;
+      if (isChargingActive()) why = `USB-C power detected (${v.toFixed(2)}V)`;
+      else if (state.powerModeIndex === 0) why = "ALWAYS ONLINE profile active (Critical Hibernate exempt)";
+      else if (state.stayAwakeOta) why = "OTA Stay-Awake ON (Critical Hibernate exempt)";
+      logEvent("power", "RECOVER", `${why}. Exiting Critical Hibernate automatically (no reboot) and restoring dashboard tab ${state.activeTab}.`);
       triggerFullCleanRefresh("Critical Hibernate Recovery");
     } else if (v < 3.45 && prevVoltage >= 3.45) {
       logEvent("power", "WARN", `LiPo Low Warning (${v.toFixed(2)}V / ${soc}% < 3.45V).`);
@@ -1642,7 +1656,7 @@
     fillRoundRect(ctx, 230, 410, 500, 44, 10, PALETTE.g14, PALETTE.ink, 2);
     ctx.fillStyle = PALETTE.ink;
     ctx.font = "700 15px 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("Connect USB-C 5V Charger or raise LiPo voltage >= 3.32V", WIDTH / 2, 432);
+    ctx.fillText("GPIO21 Top Button Wake  •  15m USB-C Auto-Recovery", WIDTH / 2, 432);
     ctx.textAlign = "left";
   }
 
@@ -1868,12 +1882,15 @@
   toggleChargingEl.addEventListener("change", () => {
     state.usbCharging = toggleChargingEl.checked;
     logEvent("power", "USB-C", `Charging / VBUS ${state.usbCharging ? "CONNECTED (lipo_charging = ON)" : "DISCONNECTED"}`);
+    // Re-evaluate: plugging in USB-C exits Critical Hibernate (no reboot); unplugging re-arms it if V < 3.32V.
+    evaluateBatteryThresholds(state.lipoVoltage);
     renderAll();
   });
 
   toggleOtaAwakeEl.addEventListener("change", () => {
     state.stayAwakeOta = toggleOtaAwakeEl.checked;
     logEvent("ha", "HA -> ESPHOME", `input_boolean.lilygo_t5_stay_awake_ota = ${state.stayAwakeOta ? "ON (Deep Sleep locked out)" : "OFF"}`);
+    evaluateBatteryThresholds(state.lipoVoltage);
     renderAll();
   });
 

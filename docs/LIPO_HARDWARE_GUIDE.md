@@ -151,4 +151,31 @@ The firmware distinguishes between an unattended **15-minute periodic timer wake
 | **Periodic 15-Minute Timer Wake** (Max Battery, or Adaptive Hybrid overnight / `SoC <= 35%`) | **`12s`** | `timer_wake_sync_sec` | Connects to Wi-Fi, syncs HA states/time, performs a single E-Paper update, and returns straight to Deep Sleep unless the user taps the screen during the sync. |
 | **Touch / `GPIO21` Button Wake — Max Battery Mode** (`mode = 2`) | **`30s`** | `max_battery_touch_timeout_sec` | Keeps Wi-Fi and touch active for `30s` after the last tap so you can toggle devices or switch tabs, then re-arms Deep Sleep. |
 | **Touch / `GPIO21` Button Wake — Adaptive Hybrid Mode** (`mode = 1`) | **`90s`** | `inactivity_timeout_sec` | Keeps the panel responsive for `90s` after the last tap before re-entering Deep Sleep during Quiet Hours or when `SoC <= 35%`. |
-| **Always Online Mode** (`mode = 0`) | **Continuous** | — | Stays connected in Wi-Fi Light Modem Sleep (`DTIM` listening) unless critical `< 3.32V` protection triggers. |
+| **Always Online Mode** (`mode = 0`) | **Continuous** | — | Stays connected in Wi-Fi Light Modem Sleep (`DTIM` listening) unless critical `< 3.32V` protection triggers **on battery only** (exempt on USB-C power, and this profile is the recommended choice for permanent wall-powered use — see Section 3.5). |
+
+
+### 3.5 Running on Continuous 5V USB-C Power: No LiPo Connected, or Aged / Worn-Out LiPo Waiting for Replacement
+
+Many installs end up wall-powered through the USB-C port, either because the battery was removed/unplugged or because an old cell no longer holds a charge. Both cases are supported by the firmware.
+
+#### Case A — No LiPo battery connected (`VBAT` reads `0.0V` / `< 2.80V`)
+- With no cell on the `JST PH 2.0` connector, the **HX6610S** charger's `BAT` terminal is open and `GPIO14` reads about `0.0V` (anything `< 2.80V` is treated as "no cell"; a real 1S cell protected by its PCM never legitimately reads below `~2.8V`).
+- The ESP32-S3 is powered straight from the 5V VBUS rail, so the display runs normally. The firmware shows **`USB-C POWER / NO LIPO CELL`** instead of a battery percentage and **never** enters Critical Hibernate.
+- Home Assistant mirrors this: the low-battery and critical-battery automations require voltage `> 2.79V`, so a `0.0V` reading does not raise a false alert.
+
+#### Case B — Aged / worn-out LiPo that no longer holds a charge
+- A degraded cell has very high **ESR** and low capacity. On USB-C the HX6610S can sit in constant-voltage float (`>= 4.14V`) yet the voltage collapses the instant the load rises, or the cell may read open/odd values.
+- To avoid mistaking this for a flat battery, the firmware treats the device as USB-C powered when it sees any of: `VBAT < 2.80V` (open terminal), CV float `>= 4.14V`, or a **positive dV** (rising voltage) at any level. It also runs a **60-second active-discharge verification**: if the voltage does not actually fall under load for 60 s while on USB-C, the cell is considered unable to discharge and USB-C power is assumed.
+- ADC2/Wi-Fi sampling glitches and the HX6610S charge-cycle sawtooth are filtered, so one bad sample cannot trip Critical Hibernate.
+
+#### Recommended profile for permanent wall power: `1. ALWAYS ONLINE`
+Select **`1. ALWAYS ONLINE`** (`mode = 0`, shown in HA as `Always Online (Modem Sleep)`) in the *Power Profile* select. It keeps Wi-Fi connected and the screen responsive, and is exempt from Critical Hibernate. **Stay-Awake OTA mode is exempt as well.** Deep-sleep profiles are only useful with a healthy battery.
+
+#### Automatic recovery (no manual reboot)
+If a unit did latch into Critical Hibernate before USB-C was connected:
+- Plug in USB-C. At the next **15-minute wake check** the firmware detects USB-C power, clears `critical_hibernate_latched`, and restores the dashboard **without rebooting**.
+- To recover immediately, press the **`GPIO21` top button**. The critical screen reads `GPIO21 Top Button Wake • 15m USB-C Auto-Recovery`.
+- The Critical Battery screen is only drawn when the latch is set, so USB-C operation will not show it.
+
+> [!WARNING]
+> Do not leave a swollen, hot, or physically damaged LiPo connected. Unplug it and run battery-less (Case A) until the replacement arrives.

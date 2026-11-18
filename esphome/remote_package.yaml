@@ -117,6 +117,8 @@ esphome:
             id(is_cold_boot) = true;
             id(last_touch_ms) = millis();
           }
+          // Critical Battery lock screen is only shown once re-confirmed this session
+          id(critical_hibernate_latched) = false;
           id(lipo_voltage).update();
       - delay: 2s
       - script.execute: request_screen_refresh
@@ -333,9 +335,10 @@ display:
 
       it.fill(COLOR_OFF);
 
-      // 1. Critical Low-Battery Protection Screen (< 3.32V)
+      // 1. Critical Battery Hibernate lock screen: ONLY once a critical discharge has
+      //    been confirmed (~60s window) by evaluate_power_state — never on raw ADC dips
       float vbat = id(lipo_voltage).state;
-      if (!isnan(vbat) && vbat > 2.0f && vbat < 3.32f && !id(lipo_charging).state) {
+      if (id(critical_hibernate_latched)) {
         draw_card(60, 50, 840, 440, false, 4);
         it.print(480, 125, id(font_mdi_48), COLOR_ON, TextAlign::TOP_CENTER, "\U000F0083");
         it.print(480, 195, id(font_bold_36), COLOR_ON, TextAlign::TOP_CENTER, "CRITICAL LIPO BATTERY");
@@ -343,9 +346,11 @@ display:
                   "Pack Voltage: %.2f V  (Cutoff Threshold: 3.32 V)", vbat);
         it.line(120, 300, 840, 300, COLOR_ON);
         it.print(480, 325, id(font_regular_18), COLOR_ON, TextAlign::TOP_CENTER,
-                 "Entering hardware over-discharge protection mode (Deep Hibernate).");
+                 "Over-discharge protection: 15-minute hibernate (re-checks automatically).");
         it.print(480, 358, id(font_bold_18), COLOR_ON, TextAlign::TOP_CENTER,
-                 "Connect a 5V USB-C cable to charge the 1S LiPo battery and resume.");
+                 "Connect 5V USB-C power - the panel resumes on its next 15m check.");
+        it.print(480, 415, id(font_regular_14), COLOR_ON, TextAlign::TOP_CENTER,
+                 "LilyGo T5 4.7\" E-Paper [H716]  •  GPIO21 Top Button Wake  •  15m USB-C Auto-Recovery Check");
         return;
       }
 
@@ -385,16 +390,30 @@ display:
 
       float soc = id(lipo_battery_level).state;
       bool chg  = id(lipo_charging).state;
-      if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
+      bool usb_inferred = id(usb_power_inferred);
+      // < 2.80V while running: no cell / tripped PCM, board is on 5V USB-C VBUS
+      bool no_cell = !isnan(vbat) && vbat < 2.80f;
+      if (isnan(vbat)) { vbat = 4.01f; soc = 84.0f; }
+      if (no_cell) soc = 0.0f;
+      // HX6610S actively charging (rising-voltage latch or CV float >= 4.14V)
+      uint32_t chg_latch = id(charging_latch_ms);
+      bool charge_active = (chg_latch > 0 && (uint32_t)(millis() - chg_latch) < 300000UL) || vbat >= 4.14f;
+      bool usb_pwr = chg || usb_inferred;
+      const char *usb_label = (!usb_inferred && charge_active) ? "USB-C CHARGING" : "USB-C POWERED";
 
-      const char *bat_icon = chg ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
-      it.print(560, 15, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
-      it.printf(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
+      if (no_cell) {
+        it.print(560, 15, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0425");
+        it.print(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "USB-C POWER");
+      } else {
+        const char *bat_icon = usb_pwr ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
+        it.print(560, 15, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, bat_icon);
+        it.printf(588, 11, id(font_bold_18), COLOR_ON, TextAlign::TOP_LEFT, "%.0f%% • %.2fV", soc, vbat);
+      }
       if (id(is_going_to_sleep)) {
         it.filled_triangle(632, 1, 624, 10, 640, 10, COLOR_ON);
       }
       it.printf(588, 33, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "%s",
-                chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
+                no_cell ? "NO LIPO CELL" : (usb_pwr ? usb_label : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE")));
 
       draw_card(740, 8, 105, 40, false, 2);
       it.print(752, 17, id(font_mdi_22), COLOR_ON, TextAlign::TOP_LEFT, "\U000F0450");
@@ -664,7 +683,9 @@ display:
         it.circle(cur_x, cur_y, 8, COLOR_ON);
 
         int lbl_y = (cur_y < gy + 24) ? (cur_y + 8) : (cur_y - 20);
-        if (cur_x > gx + gw - 115) {
+        if (no_cell) {
+          it.print(cur_x + 12, lbl_y, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "NO LIPO CELL");
+        } else if (cur_x > gx + gw - 115) {
           it.printf(cur_x - 12, lbl_y, id(font_bold_14), COLOR_ON, TextAlign::TOP_RIGHT, "%.2fV (%.0f%%)", vbat, soc);
         } else {
           it.printf(cur_x + 12, lbl_y, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "%.2fV (%.0f%%)", vbat, soc);
@@ -734,7 +755,11 @@ display:
         // 3. Main Right Card (x: 650, y: 152, w: 290, h: 240): 1S LiPo Telemetry & Diagnostics
         draw_card(650, 152, 290, 240, false, 2);
         it.print(668, 164, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT, "LIPO TELEMETRY (GPIO14)");
-        it.printf(668, 188, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.2f V  (%.0f%%)", vbat, soc);
+        if (no_cell) {
+          it.print(668, 188, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "USB-C (NO BATT)");
+        } else {
+          it.printf(668, 188, id(font_bold_24), COLOR_ON, TextAlign::TOP_LEFT, "%.2f V  (%.0f%%)", vbat, soc);
+        }
 
         it.rectangle(668, 222, 254, 18, COLOR_ON);
         int bar_w = (int)(soc_frac * 250.0f);
@@ -750,7 +775,7 @@ display:
         int q_end      = !isnan(id(ha_quiet_end).state)   ? (int)id(ha_quiet_end).state   : 6;
 
         it.printf(668, 250, id(font_bold_14), COLOR_ON, TextAlign::TOP_LEFT,
-                  "State: %s", chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA LOCKED (HA)" : "1S LIPO DISCHARGING"));
+                  "State: %s", no_cell ? "USB-C DIRECT POWER" : (usb_pwr ? usb_label : (id(ha_stay_awake_ota).state ? "OTA LOCKED (HA)" : "1S LIPO DISCHARGING")));
         it.printf(668, 274, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT, "Wake: %s", wake.c_str());
         it.printf(668, 298, id(font_regular_14), COLOR_ON, TextAlign::TOP_LEFT,
                   "Wi-Fi: %.0f dBm  •  Up: %.0fs", rssi_val, up_val);

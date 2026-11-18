@@ -103,8 +103,18 @@ inline std::string format_condition_label(const std::string &cond) {
   return out;
 }
 
+// Returns true while the HX6610S is actively pushing charge current
+// (rising-voltage latch active, or CV float >= 4.14V). Otherwise a USB-C
+// powered panel is shown as "USB-C POWERED" (steady / old or idle cell).
+inline bool lipo_charge_active(float vbat) {
+  uint32_t latch = id(charging_latch_ms);
+  bool latch_active = latch > 0 && (uint32_t)(millis() - latch) < 300000UL;
+  return latch_active || (!isnan(vbat) && vbat >= 4.14f);
+}
+
 // ==============================================================================
-// 1. Critical Low-Battery Hibernate Protection Screen (< 3.32V)
+// 1. Critical Low-Battery Hibernate Protection Screen (confirmed < 3.32V)
+//    Rendered ONLY when critical_hibernate_latched is set by evaluate_power_state
 // ==============================================================================
 inline void render_critical_battery_screen(esphome::display::Display &it, float vbat) {
   it.fill(esphome::display::COLOR_OFF);
@@ -119,11 +129,11 @@ inline void render_critical_battery_screen(esphome::display::Display &it, float 
   it.line(120, 300, 840, 300, esphome::display::COLOR_ON);
 
   it.print(480, 325, &id(font_regular_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER,
-           "Entering hardware over-discharge protection mode (Deep Hibernate).");
+           "Over-discharge protection: 15-minute hibernate (re-checks automatically).");
   it.print(480, 358, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER,
-           "Connect a 5V USB-C cable to charge the 1S LiPo battery and resume.");
+           "Connect 5V USB-C power - the panel resumes on its next 15m check.");
   it.print(480, 415, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_CENTER,
-           "LilyGo T5 4.7\" E-Paper [H716]  •  GPIO16 EXT0 Touch Wake Armed");
+           "LilyGo T5 4.7\" E-Paper [H716]  •  GPIO21 Top Button Wake  •  15m USB-C Auto-Recovery Check");
 }
 
 // ==============================================================================
@@ -170,18 +180,36 @@ inline void render_header(esphome::display::Display &it) {
   float vbat = id(lipo_voltage).state;
   float soc  = id(lipo_battery_level).state;
   bool chg   = id(lipo_charging).state;
-  if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
+  bool usb_inferred = id(usb_power_inferred);
+  // < 2.80V while running: no cell / tripped PCM, board is on 5V USB-C VBUS
+  bool no_cell = !isnan(vbat) && vbat < 2.80f;
 
-  const char *bat_icon = chg ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
-  it.print(560, 15, &id(font_mdi_22), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT, bat_icon);
-  it.printf(588, 11, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "%.0f%% • %.2fV", soc, vbat);
+  if (no_cell) {
+    it.print(560, 15, &id(font_mdi_22), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT, "\U000F0425");
+    it.print(588, 11, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+             "USB-C POWER");
+  } else {
+    if (isnan(vbat)) { vbat = 4.01f; soc = 84.0f; }
+    bool usb_pwr = chg || usb_inferred;
+    const char *bat_icon = usb_pwr ? "\U000F0084" : ((vbat < 3.45f) ? "\U000F0083" : "\U000F0079");
+    it.print(560, 15, &id(font_mdi_22), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT, bat_icon);
+    it.printf(588, 11, &id(font_bold_18), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+              "%.0f%% • %.2fV", soc, vbat);
+  }
   if (id(is_going_to_sleep)) {
     // Upward arrow pointing directly at the top-edge physical wake button above the dot (x=632)
     it.filled_triangle(632, 1, 624, 10, 640, 10, esphome::display::COLOR_ON);
   }
+  const char *pwr_label = "1S LIPO ACTIVE";
+  if (no_cell) {
+    pwr_label = "NO LIPO CELL";
+  } else if (chg || usb_inferred) {
+    pwr_label = (!usb_inferred && lipo_charge_active(vbat)) ? "USB-C CHARGING" : "USB-C POWERED";
+  } else if (id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) {
+    pwr_label = "OTA / ALWAYS ON";
+  }
   it.printf(588, 33, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "%s", chg ? "USB-C CHARGING" : ((id(power_mode_index) == 0 || id(ha_stay_awake_ota).state) ? "OTA / ALWAYS ON" : "1S LIPO ACTIVE"));
+            "%s", pwr_label);
 
   // Header Quick Button 1: [REFRESH] (x: 740..845, y: 8..48)
   draw_card(it, 740, 8, 105, 40, false, 2);
@@ -511,7 +539,11 @@ inline void render_tab_power(esphome::display::Display &it) {
   float vbat = id(lipo_voltage).state;
   float soc  = id(lipo_battery_level).state;
   bool chg   = id(lipo_charging).state;
-  if (isnan(vbat) || vbat < 0.5f) { vbat = 4.01f; soc = 84.0f; }
+  bool usb_inferred = id(usb_power_inferred);
+  // < 2.80V while running: no cell / tripped PCM, board is on 5V USB-C VBUS
+  bool no_cell = !isnan(vbat) && vbat < 2.80f;
+  if (isnan(vbat)) { vbat = 4.01f; soc = 84.0f; }
+  if (no_cell) soc = 0.0f;
 
   // 1. Row 1 (y: 66..142, h: 76): 3 Compact Power Mode Selector Buttons
   struct ModeCard {
@@ -608,7 +640,10 @@ inline void render_tab_power(esphome::display::Display &it) {
   it.circle(cur_x, cur_y, 8, esphome::display::COLOR_ON);
 
   int lbl_y = (cur_y < gy + 24) ? (cur_y + 8) : (cur_y - 20);
-  if (cur_x > gx + gw - 115) {
+  if (no_cell) {
+    it.print(cur_x + 12, lbl_y, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+             "NO LIPO CELL");
+  } else if (cur_x > gx + gw - 115) {
     it.printf(cur_x - 12, lbl_y, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_RIGHT,
               "%.2fV (%.0f%%)", vbat, soc);
   } else {
@@ -690,8 +725,13 @@ inline void render_tab_power(esphome::display::Display &it) {
   draw_card(it, 650, 152, 290, 240, false, 2);
   it.print(668, 164, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
            "LIPO TELEMETRY (GPIO14)");
-  it.printf(668, 188, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "%.2f V  (%.0f%%)", vbat, soc);
+  if (no_cell) {
+    it.print(668, 188, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+             "USB-C (NO BATT)");
+  } else {
+    it.printf(668, 188, &id(font_bold_24), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
+              "%.2f V  (%.0f%%)", vbat, soc);
+  }
 
   // SoC Progress Bar (x: 668, y: 222, w: 254, h: 18)
   it.rectangle(668, 222, 254, 18, esphome::display::COLOR_ON);
@@ -707,8 +747,16 @@ inline void render_tab_power(esphome::display::Display &it) {
   int q_start    = !isnan(id(ha_quiet_start).state) ? (int)id(ha_quiet_start).state : 23;
   int q_end      = !isnan(id(ha_quiet_end).state)   ? (int)id(ha_quiet_end).state   : 6;
 
+  const char *state_txt = "1S LIPO DISCHARGING";
+  if (no_cell) {
+    state_txt = "USB-C DIRECT POWER";
+  } else if (chg || usb_inferred) {
+    state_txt = (!usb_inferred && lipo_charge_active(vbat)) ? "USB-C CHARGING" : "USB-C POWERED";
+  } else if (id(ha_stay_awake_ota).state) {
+    state_txt = "OTA LOCKED (HA)";
+  }
   it.printf(668, 250, &id(font_bold_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
-            "State: %s", chg ? "USB-C CHARGING" : (id(ha_stay_awake_ota).state ? "OTA LOCKED (HA)" : "1S LIPO DISCHARGING"));
+            "State: %s", state_txt);
   it.printf(668, 274, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
             "Wake: %s", wake.c_str());
   it.printf(668, 298, &id(font_regular_14), esphome::display::COLOR_ON, esphome::display::TextAlign::TOP_LEFT,
@@ -734,9 +782,10 @@ inline void render_tab_power(esphome::display::Display &it) {
 inline void render_dashboard(esphome::display::Display &it, const DashboardLabels &labels) {
   it.fill(esphome::display::COLOR_OFF);
 
-  // Check for Critical Low-Battery Cutoff (< 3.32V when running on LiPo)
+  // Critical Battery Hibernate lock screen: ONLY once a critical discharge has been
+  // confirmed (~60s window) by evaluate_power_state — never on raw ADC dips
   float vbat = id(lipo_voltage).state;
-  if (!isnan(vbat) && vbat > 2.0f && vbat < 3.32f && !id(lipo_charging).state) {
+  if (id(critical_hibernate_latched)) {
     render_critical_battery_screen(it, vbat);
     return;
   }

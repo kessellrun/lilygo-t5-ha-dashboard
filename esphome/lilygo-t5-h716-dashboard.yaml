@@ -34,8 +34,9 @@ substitutions:
   # ----------------------------------------------------------------------------
   # Voltage threshold for Low Battery warning icon & HA alert (3.45V ~= 7% SoC)
   vbat_warn: "3.45"
-  # Critical over-discharge cutoff voltage (3.32V). Below this, the display
-  # renders a lock screen and enters indefinite Deep Sleep with timer disabled.
+  # Critical over-discharge cutoff voltage (3.32V). A cell below this (and NOT on
+  # USB-C / charging) is confirmed over ~60s, then the display renders a lock
+  # screen and hibernates 15 minutes (GPIO21 / 15m timer wake auto-recovery).
   vbat_critical: "3.32"
   # State-of-Charge (%) threshold where Adaptive Hybrid mode switches from
   # active daytime modem-sleep to Touch-Armed Deep Sleep to conserve battery.
@@ -159,6 +160,8 @@ esphome:
             id(is_cold_boot) = true;
             id(last_touch_ms) = millis();
           }
+          // Critical Battery lock screen is only shown once re-confirmed this session
+          id(critical_hibernate_latched) = false;
           id(lipo_voltage).update();
       - delay: 2s
       - script.execute: request_screen_refresh

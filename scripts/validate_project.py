@@ -7,10 +7,11 @@ Author: Verifier Subagent
 Validates:
 1. File existence and non-emptiness across esphome/, homeassistant/, simulator/, docs/, and root.
 2. YAML syntax across all ESPHome and Home Assistant YAML configurations with custom tag constructors.
-3. Cross-check of all ESPHome component IDs referenced via id(...) against declared id: definitions.
+3. Cross-check of all ESPHome component IDs referenced via id(...) against declared id: definitions (including remote_package.yaml).
 4. GT911 touchscreen hitbox coordinates (0 <= x_min < x_max <= 960, 0 <= y_min < y_max <= 540).
 5. Simulator HTML/CSS/JS verification (4 tabs, 960x540 canvas, LiPo curve, HA event console).
 6. Setup and hardware documentation completeness.
+7. USB-C and Critical Hibernate regression & parity checks across firmware, UI, HA, and simulator.
 """
 
 import os
@@ -297,7 +298,9 @@ class ProjectValidator:
         files_to_check = [
             esphome_dir / "include" / "epd_dashboard_ui.h",
             esphome_dir / "lilygo-t5-h716-dashboard.yaml",
-        ] + list((esphome_dir / "packages").glob("*.yaml"))
+            esphome_dir / "remote_package.yaml",
+            esphome_dir / "bedroom_package.yaml",
+        ] + list((esphome_dir / "packages").glob("*.yaml")) + list((esphome_dir / "devices").glob("*.yaml"))
 
         for fpath in files_to_check:
             if not fpath.exists():
@@ -455,6 +458,322 @@ class ProjectValidator:
             self.check(len(txt) > 500, "README Content", f"README.md present ({len(txt):,} bytes)", "README.md is too short or empty", "@ha-and-docs")
 
     # ==========================================
+    # Check 7: USB-C & Critical Hibernate Parity
+    # ==========================================
+    def check_power_and_critical_hibernate_parity(self):
+        log_header("CHECK 7: USB-C & Critical Hibernate Regression & Parity Suite")
+
+        lipo_yaml = self.root / "esphome" / "packages" / "lipo_power_manager.yaml"
+        epd_header = self.root / "esphome" / "include" / "epd_dashboard_ui.h"
+        remote_yaml = self.root / "esphome" / "remote_package.yaml"
+        h716_yaml = self.root / "esphome" / "lilygo-t5-h716-dashboard.yaml"
+        ha_yaml = self.root / "homeassistant" / "packages" / "lilygo_t5_dashboard.yaml"
+        sim_js = self.root / "simulator" / "simulator.js"
+
+        # --- A. lipo_power_manager.yaml checks ---
+        if lipo_yaml.exists():
+            lipo_txt = lipo_yaml.read_text(encoding="utf-8")
+
+            # A1: Critical & USB state globals
+            required_globals = [
+                "critical_hibernate_latched", "usb_power_inferred", "usb_sawtooth_ms",
+                "charging_latch_ms", "baseline_lipo_v", "baseline_lipo_ms",
+                "peak_lipo_v", "crit_sample_count", "crit_window_start_v",
+                "low_raw_adc_streak", "prev_raw_lipo_v", "prev_wake_vbat"
+            ]
+            for g in required_globals:
+                self.check(
+                    f"id: {g}" in lipo_txt,
+                    "Firmware Globals",
+                    f"Global '{g}' declared in lipo_power_manager.yaml",
+                    f"Global '{g}' missing from lipo_power_manager.yaml",
+                    "@firmware"
+                )
+
+            # A2: Transient ADC2 0V glitch rejection
+            has_adc2_debounce = (
+                "low_raw_adc_streak" in lipo_txt and
+                "< 3" in lipo_txt and
+                "return {};" in lipo_txt
+            )
+            self.check(
+                has_adc2_debounce,
+                "ADC2 0V Debounce",
+                "ADC2 0V glitch debounce drops transient samples (< 3 streak) in lipo_power_manager.yaml",
+                "ADC2 0V glitch debounce missing or incomplete in lipo_power_manager.yaml",
+                "@firmware"
+            )
+
+            # A3: Median filter and removal of moving average
+            has_median = "median:" in lipo_txt and "window_size: 5" in lipo_txt
+            no_moving_avg = "sliding_window_moving_average" not in lipo_txt
+            self.check(
+                has_median and no_moving_avg,
+                "ADC Median Filter",
+                "5-sample median filter present and sliding_window_moving_average removed in lipo_power_manager.yaml",
+                "Median filter missing or sliding_window_moving_average still present in lipo_power_manager.yaml",
+                "@firmware"
+            )
+
+            # A4: USB-C and charging heuristics
+            has_no_batt_usb = "v < 2.80f" in lipo_txt or "vbat < 2.80f" in lipo_txt
+            has_sawtooth = "usb_sawtooth_ms" in lipo_txt and "fabsf(x - id(prev_raw_lipo_v)) >= 0.28f" in lipo_txt
+            has_cv_float = "v >= 4.14f" in lipo_txt
+            has_rising_chg = "v >= 2.50f" in lipo_txt and "0.015f" in lipo_txt
+            no_385_blocker = "3.85f" not in lipo_txt
+            has_unplug_detect = "0.04f" in lipo_txt and "peak_lipo_v" in lipo_txt
+
+            self.check(
+                has_no_batt_usb and has_sawtooth and has_cv_float and has_rising_chg and no_385_blocker and has_unplug_detect,
+                "Charging Heuristics",
+                "USB-C heuristics valid: <2.80V no-batt, sawtooth, >=4.14V CV float, rising-chg >=2.50V (no 3.85V blocker), 40mV unplug drop",
+                "Charging heuristics flawed or missing checks in lipo_power_manager.yaml",
+                "@firmware"
+            )
+
+            # A5: Mode 0 (Always Online) & OTA Stay-Awake exemption from Critical Hibernate
+            has_mode0_exempt = "id(power_mode_index) == 0" in lipo_txt and "reset_critical" in lipo_txt
+            has_ota_exempt = ("ota_in_progress" in lipo_txt or "ha_stay_awake_ota" in lipo_txt) and "prevent_deep_sleep" in lipo_txt
+            self.check(
+                has_mode0_exempt and has_ota_exempt,
+                "Critical Hibernate Exemption",
+                "Mode 0 (Always Online) and OTA Stay-Awake exempt from Critical Hibernate in lipo_power_manager.yaml",
+                "Always Online or OTA Stay-Awake exemption missing from lipo_power_manager.yaml",
+                "@firmware"
+            )
+
+            # A6: Real discharge confirmation window (~60s) before latching
+            has_confirm_window = (
+                "crit_sample_count" in lipo_txt and
+                "< 6" in lipo_txt and
+                "usb_power_inferred" in lipo_txt and
+                "critical_hibernate_latched) = true" in lipo_txt
+            )
+            self.check(
+                has_confirm_window,
+                "Critical Confirmation Window",
+                "~60s (6 sample) discharge confirmation window prevents false hibernates on flat/USB voltage",
+                "Critical confirmation window missing or doesn't latch usb_power_inferred vs critical_hibernate_latched",
+                "@firmware"
+            )
+
+            # A7: 15-minute recovery sleep duration (no 24h lockout)
+            has_15m_deep_sleep = "sleep_duration: 15min" in lipo_txt and "enter_critical_hibernate" in lipo_txt
+            self.check(
+                has_15m_deep_sleep,
+                "Recovery Sleep Duration",
+                "Critical Hibernate uses 15-minute auto-recovery sleep (24h lockout eliminated)",
+                "15-minute sleep duration missing in lipo_power_manager.yaml",
+                "@firmware"
+            )
+
+        # --- B. epd_dashboard_ui.h checks ---
+        if epd_header.exists():
+            epd_txt = epd_header.read_text(encoding="utf-8")
+
+            # B1: Critical screen gated on critical_hibernate_latched
+            has_latched_gate = "if (id(critical_hibernate_latched))" in epd_txt
+            self.check(
+                has_latched_gate,
+                "UI Critical Gating",
+                "epd_dashboard_ui.h gates critical screen strictly on id(critical_hibernate_latched)",
+                "epd_dashboard_ui.h critical screen not gated on id(critical_hibernate_latched)",
+                "@firmware"
+            )
+
+            # B2: USB-C no battery icon and labels
+            has_no_batt_icon = r"\U000F0425" in epd_txt
+            has_no_batt_labels = "USB-C POWER" in epd_txt and "NO LIPO CELL" in epd_txt and "USB-C DIRECT POWER" in epd_txt
+            self.check(
+                has_no_batt_icon and has_no_batt_labels,
+                "UI No-Battery Display",
+                r"epd_dashboard_ui.h renders \U000F0425, 'USB-C POWER', 'NO LIPO CELL', and 'USB-C DIRECT POWER'",
+                "epd_dashboard_ui.h missing no-battery icon or labels",
+                "@firmware"
+            )
+
+            # B3: Critical screen recovery message
+            has_screen_text = (
+                "15-minute hibernate" in epd_txt or "15m USB-C Auto-Recovery" in epd_txt
+            ) and "GPIO21" in epd_txt
+            self.check(
+                has_screen_text,
+                "UI Critical Screen Text",
+                "epd_dashboard_ui.h critical screen communicates 15m USB-C auto-recovery and GPIO21 wake",
+                "epd_dashboard_ui.h critical screen text out of date",
+                "@firmware"
+            )
+
+            # B4: Active charging helper
+            has_chg_active = "lipo_charge_active" in epd_txt and "4.14f" in epd_txt
+            self.check(
+                has_chg_active,
+                "UI Charging Helper",
+                "epd_dashboard_ui.h provides lipo_charge_active() checking CV float (>=4.14V) & charging latch",
+                "epd_dashboard_ui.h lipo_charge_active() helper missing or does not check >=4.14V",
+                "@firmware"
+            )
+
+        # --- C. remote_package.yaml parity checks ---
+        if remote_yaml.exists():
+            remote_txt = remote_yaml.read_text(encoding="utf-8")
+
+            # C1: Critical screen gated on critical_hibernate_latched
+            has_remote_gate = "if (id(critical_hibernate_latched))" in remote_txt
+            self.check(
+                has_remote_gate,
+                "Remote Package Critical Gating",
+                "remote_package.yaml gates critical screen on id(critical_hibernate_latched)",
+                "remote_package.yaml critical screen not gated on id(critical_hibernate_latched)",
+                "@firmware"
+            )
+
+            # C2: No-battery icon and label parity
+            has_remote_no_batt = r"\U000F0425" in remote_txt and "NO LIPO CELL" in remote_txt and "USB-C POWER" in remote_txt
+            self.check(
+                has_remote_no_batt,
+                "Remote Package No-Battery Display",
+                r"remote_package.yaml matches epd_dashboard_ui.h with \U000F0425 and 'NO LIPO CELL' / 'USB-C POWER'",
+                "remote_package.yaml missing no-battery display parity",
+                "@firmware"
+            )
+
+            # C3: Boot reset of critical latch
+            has_boot_reset = "id(critical_hibernate_latched) = false;" in remote_txt
+            self.check(
+                has_boot_reset,
+                "Remote Package Boot Reset",
+                "remote_package.yaml clears critical_hibernate_latched on boot",
+                "remote_package.yaml does not clear critical_hibernate_latched on boot",
+                "@firmware"
+            )
+
+        # --- D. homeassistant/packages/lilygo_t5_dashboard.yaml checks ---
+        if ha_yaml.exists():
+            ha_txt = ha_yaml.read_text(encoding="utf-8")
+
+            # D1: Living room low battery alert above: 2.79 and charging == 'off'
+            has_lr_low_thresh = (
+                "above: 2.79" in ha_txt and
+                "below: 3.68" in ha_txt and
+                "sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage" in ha_txt
+            )
+            self.check(
+                has_lr_low_thresh,
+                "HA Living Room Low Battery Alert",
+                "HA Living Room low battery alert triggers on voltage above: 2.79 / below: 3.68",
+                "HA Living Room low battery alert missing above: 2.79 trigger floor",
+                "@ha-and-docs"
+            )
+
+            # D2: Living room critical alert above: 2.79, below: 3.32, charging == 'off'
+            has_lr_crit = (
+                "above: 2.79" in ha_txt and
+                "below: 3.32" in ha_txt and
+                "binary_sensor.lilygo_t5_h716_dashboard_lipo_battery_charging" in ha_txt and
+                "15-minute wake check" in ha_txt
+            )
+            self.check(
+                has_lr_crit,
+                "HA Living Room Critical Alert",
+                "HA Living Room critical alert gates on 2.79V < V < 3.32V and charging == 'off' with 15m recovery text",
+                "HA Living Room critical alert missing floor, charging condition, or 15m recovery text",
+                "@ha-and-docs"
+            )
+
+            # D3: Bedroom low battery alert above: 2.79 and charging == 'off'
+            has_br_low_thresh = (
+                "above: 2.79" in ha_txt and
+                "below: 3.68" in ha_txt and
+                "sensor.lilygo_t5_bedroom_lipo_battery_voltage" in ha_txt
+            )
+            self.check(
+                has_br_low_thresh,
+                "HA Bedroom Low Battery Alert",
+                "HA Bedroom low battery alert triggers on voltage above: 2.79 / below: 3.68",
+                "HA Bedroom low battery alert missing above: 2.79 trigger floor",
+                "@ha-and-docs"
+            )
+
+            # D4: Bedroom critical alert above: 2.79, below: 3.32, charging == 'off'
+            has_br_crit = (
+                "above: 2.79" in ha_txt and
+                "below: 3.32" in ha_txt and
+                "binary_sensor.lilygo_t5_bedroom_lipo_battery_charging" in ha_txt and
+                "15-minute wake check" in ha_txt
+            )
+            self.check(
+                has_br_crit,
+                "HA Bedroom Critical Alert",
+                "HA Bedroom critical alert gates on 2.79V < V < 3.32V and charging == 'off' with 15m recovery text",
+                "HA Bedroom critical alert missing floor, charging condition, or 15m recovery text",
+                "@ha-and-docs"
+            )
+
+        # --- E. simulator/simulator.js checks ---
+        if sim_js.exists():
+            js_txt = sim_js.read_text(encoding="utf-8")
+
+            # E1: isChargingActive checks >= 4.14
+            has_sim_chg = "state.lipoVoltage >= 4.14" in js_txt and "state.usbCharging" in js_txt
+            self.check(
+                has_sim_chg,
+                "Simulator Charging Detection",
+                "simulator.js isChargingActive() checks state.usbCharging || lipoVoltage >= 4.14",
+                "simulator.js isChargingActive() missing 4.14V CV float threshold",
+                "@simulator"
+            )
+
+            # E2: isCriticalExempt checks charging, powerModeIndex === 0, stayAwakeOta
+            has_sim_exempt = (
+                "isCriticalExempt" in js_txt and
+                "state.powerModeIndex === 0" in js_txt and
+                "state.stayAwakeOta" in js_txt
+            )
+            self.check(
+                has_sim_exempt,
+                "Simulator Critical Exemption",
+                "simulator.js isCriticalExempt() checks isChargingActive, powerModeIndex === 0, and stayAwakeOta",
+                "simulator.js isCriticalExempt() incomplete or missing",
+                "@simulator"
+            )
+
+            # E3: evaluateBatteryThresholds auto-exits critical hibernate
+            has_sim_auto_exit = (
+                "state.isCriticalHibernate = v < 3.32 && !isCriticalExempt()" in js_txt and
+                "triggerFullCleanRefresh" in js_txt
+            )
+            self.check(
+                has_sim_auto_exit,
+                "Simulator Auto-Exit Critical",
+                "simulator.js evaluateBatteryThresholds prevents and auto-exits Critical Hibernate",
+                "simulator.js does not prevent or auto-exit Critical Hibernate when exempt",
+                "@simulator"
+            )
+
+            # E4: Toggle listeners call evaluateBatteryThresholds
+            has_listener_calls = (
+                js_txt.count("evaluateBatteryThresholds(state.lipoVoltage)") >= 2
+            )
+            self.check(
+                has_listener_calls,
+                "Simulator Event Handlers",
+                "simulator.js charging and OTA awake toggle listeners re-evaluate battery thresholds",
+                "simulator.js event listeners do not trigger battery threshold re-evaluation",
+                "@simulator"
+            )
+
+            # E5: Screen caption text
+            has_sim_caption = "GPIO21 Top Button Wake  •  15m USB-C Auto-Recovery" in js_txt or "15m USB-C Auto-Recovery" in js_txt
+            self.check(
+                has_sim_caption,
+                "Simulator Critical Caption",
+                "simulator.js critical screen caption matches firmware: '15m USB-C Auto-Recovery'",
+                "simulator.js critical screen caption does not match firmware",
+                "@simulator"
+            )
+
+    # ==========================================
     # Run All Checks & Produce Report
     # ==========================================
     def run_all(self):
@@ -467,6 +786,7 @@ class ProjectValidator:
         self.check_gt911_hitboxes()
         self.check_simulator_completeness()
         self.check_documentation()
+        self.check_power_and_critical_hibernate_parity()
 
         # Summary
         log_header("VERIFICATION SUMMARY REPORT")

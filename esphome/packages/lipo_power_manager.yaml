@@ -4,13 +4,24 @@
 # The LilyGo T5 4.7" [H716] routes the 2-pin JST 2.0mm PH LiPo battery connector
 # through an internal 100k/100k (2:1) resistor divider to ESP32-S3 GPIO14.
 #
+# NOTE: GPIO14 is ADC2_CH3 on the ESP32-S3, which is shared with the Wi-Fi RF
+# block. Transient 0V collisions are dropped by a debounce lambda and a 5-sample
+# median filter (a moving average would smear a single 0V sample into a phantom
+# ~3.1V "critical" reading).
+#
 # Three Selectable Power Profiles:
 #   0 = ALWAYS ONLINE (Modem Sleep) : Instant HA push updates (~18mA avg)
 #   1 = ADAPTIVE HYBRID (Default)   : Modem Sleep during daytime when SoC > 35%;
 #                                     Touch-Armed Deep Sleep during Quiet Hours
 #                                     (23:00-06:00) or when SoC <= 35% (~1.2mA)
 #   2 = MAX BATTERY (Deep Sleep)    : Wakes every 15m via PCF8563/Timer OR
-#                                     instantly on GT911 GPIO16 screen touch!
+#                                     instantly on the GPIO21 top wake button!
+#
+# Critical Battery Protection (< vbat_critical, 3.32V) is debounced over a ~60s
+# confirmation window and is skipped entirely in Always Online / OTA Stay-Awake,
+# while charging, or while 5V USB-C power is detected/inferred. A confirmed
+# critical cell hibernates for 15 minutes (not 24h) so the panel automatically
+# recovers once USB-C power is connected — no physical reboot required.
 # ==============================================================================
 
 wifi:
@@ -119,17 +130,97 @@ globals:
     restore_value: true
     initial_value: 'false'
 
-  # Previous ADC sample voltage for positive dV/dt charging detection
+  # Previous filtered ADC sample voltage (kept for diagnostics / compatibility)
   - id: prev_lipo_voltage
     type: float
     restore_value: true
     initial_value: '3.95'
 
-  # Latched charging heuristic state updated on each ADC filter output
+  # Latched charging / external USB-C power state updated on each ADC filter output
   - id: is_charging_state
     type: bool
     restore_value: true
     initial_value: 'false'
+
+  # ---------------------------------------------------------------------------
+  # ADC2 Debounce, HX6610S Charger & USB-C Power Detection State
+  # ---------------------------------------------------------------------------
+  # Consecutive raw readings < 0.45V (ADC2 / Wi-Fi collisions are dropped until 3)
+  - id: low_raw_adc_streak
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+  # Previous accepted raw (pre-median) battery voltage for sawtooth detection
+  - id: prev_raw_lipo_v
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  # millis() of last HX6610S open-terminal / tripped-PCM sawtooth jump (>= 0.28V)
+  - id: usb_sawtooth_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # millis() of last rising-voltage charge detection (5 minute latch)
+  - id: charging_latch_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # Rolling ~60s voltage baseline used for rising-voltage charge detection
+  - id: baseline_lipo_v
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  - id: baseline_lipo_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # Highest filtered voltage seen since the last charge / unplug transition
+  - id: peak_lipo_v
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  # True when 5V USB-C VBUS was inferred to be carrying the system load
+  # (voltage held flat under ~60s of active Wi-Fi load with a weak/old cell)
+  - id: usb_power_inferred
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  # Critical low-battery confirmation window (6 samples ~= 60s)
+  - id: crit_sample_count
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+  - id: crit_window_start_v
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  - id: last_crit_sample_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  # True only once a critical discharge has been CONFIRMED and the panel is
+  # about to enter the 15-minute Critical Battery Hibernate (drives the lock screen)
+  - id: critical_hibernate_latched
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  # Battery voltage recorded right before the previous Deep Sleep entry
+  - id: prev_wake_vbat
+    type: float
+    restore_value: true
+    initial_value: '0.0'
 
   # True when current wake session originated from 15m timer without user touch
   - id: is_timer_wake
@@ -199,18 +290,100 @@ sensor:
     update_interval: 10s
     filters:
       - multiply: 2.0
-      - sliding_window_moving_average:
-          window_size: 4
+      # ADC2 (Wi-Fi shared) collision debounce + HX6610S sawtooth detection
+      - lambda: |-
+          if (isnan(x)) return {};
+          if (x < 0.45f) {
+            if (id(low_raw_adc_streak) < 1000) id(low_raw_adc_streak) += 1;
+            // Drop transient ADC2 / Wi-Fi 0V collisions
+            if (id(low_raw_adc_streak) < 3) return {};
+            // Persistently ~0V: genuinely no battery connected
+            return x;
+          }
+          id(low_raw_adc_streak) = 0;
+          if (id(prev_raw_lipo_v) > 0.5f && fabsf(x - id(prev_raw_lipo_v)) >= 0.28f) {
+            // HX6610S open-terminal or tripped-PCM charge pulsing (USB-C present)
+            uint32_t now_ms = millis();
+            id(usb_sawtooth_ms) = now_ms ? now_ms : 1UL;
+          }
+          id(prev_raw_lipo_v) = x;
+          return x;
+      - median:
+          window_size: 5
           send_every: 1
           send_first_at: 1
     on_value:
       then:
         - lambda: |-
             float v = x;
-            if (!isnan(v) && v > 2.0f) {
-              float dv = v - id(prev_lipo_voltage);
-              id(is_charging_state) = (v > 4.21f) || (dv >= 0.025f && v > 3.85f);
-              id(prev_lipo_voltage) = v;
+            bool valid = !isnan(v);
+            uint32_t now_ms = millis();
+            uint32_t stamp = now_ms ? now_ms : 1UL;
+
+            bool latch_was_active = id(charging_latch_ms) > 0 &&
+                (uint32_t)(now_ms - id(charging_latch_ms)) < 300000UL;
+
+            // 1. USB-C unplug detection: battery begins discharging below its peak
+            float prev_peak = id(peak_lipo_v);
+            if (valid && v >= 2.80f && prev_peak > 2.80f && (prev_peak - v) >= 0.04f) {
+              bool had_usb = latch_was_active || id(usb_power_inferred);
+              id(charging_latch_ms) = 0;
+              id(usb_power_inferred) = false;
+              if (had_usb) {
+                ESP_LOGW("power", "LiPo dropped %.3fV below peak %.2fV — USB-C charge/power cleared",
+                         prev_peak - v, prev_peak);
+                // Remember the pre-drop level so a weak cell is not re-inferred as USB powered
+                id(prev_wake_vbat) = prev_peak;
+              }
+              id(peak_lipo_v) = v;
+            } else if (valid && v > prev_peak) {
+              // New high while latched => CC charge still progressing, extend latch
+              if (latch_was_active && v >= prev_peak + 0.005f) {
+                id(charging_latch_ms) = stamp;
+              }
+              id(peak_lipo_v) = v;
+            }
+
+            // 2. Rolling ~60s baseline for rising-voltage charge detection
+            if (valid && v >= 2.50f && (id(baseline_lipo_ms) == 0 || id(baseline_lipo_v) < 2.50f)) {
+              id(baseline_lipo_v) = v;
+              id(baseline_lipo_ms) = stamp;
+            }
+
+            // 3. External USB-C power / charging heuristics (no IDF-only headers)
+            //    ESP32-S3 + 3.3V LDO browns out below ~2.85V on battery, so a
+            //    running board reading < 2.80V proves 5V USB-C VBUS is present.
+            bool no_batt_usb  = valid && v < 2.80f;
+            bool sawtooth_usb = id(usb_sawtooth_ms) > 0 &&
+                (uint32_t)(now_ms - id(usb_sawtooth_ms)) < 300000UL;
+            bool cv_float     = valid && v >= 4.14f;
+            bool rising_chg   = valid && v >= 2.50f && id(baseline_lipo_v) >= 2.50f &&
+                (v - id(baseline_lipo_v)) >= 0.015f;
+            if (rising_chg) {
+              id(charging_latch_ms) = stamp;
+              id(peak_lipo_v) = v;
+            }
+            bool latch_active = id(charging_latch_ms) > 0 &&
+                (uint32_t)(now_ms - id(charging_latch_ms)) < 300000UL;
+
+            if (valid && v >= 2.50f && (uint32_t)(now_ms - id(baseline_lipo_ms)) >= 60000UL) {
+              id(baseline_lipo_v) = v;
+              id(baseline_lipo_ms) = stamp;
+            }
+
+            // Capture previous power state for immediate header refresh on transitions
+            bool prev_chg = id(is_charging_state);
+            bool prev_no_batt = (!isnan(id(prev_lipo_voltage)) && id(prev_lipo_voltage) < 2.80f);
+
+            id(is_charging_state) = cv_float || rising_chg || latch_active ||
+                                    sawtooth_usb || no_batt_usb || id(usb_power_inferred);
+            if (valid) id(prev_lipo_voltage) = v;
+
+            // USB-C plug/unplug or USB-C POWER / NO LIPO CELL transition: refresh now
+            if ((id(is_charging_state) != prev_chg || no_batt_usb != prev_no_batt) && !id(is_timer_wake)) {
+              ESP_LOGI("power", "Power source changed (charging/USB %d -> %d, no-cell %d -> %d) — refreshing E-Paper",
+                       (int)prev_chg, (int)id(is_charging_state), (int)prev_no_batt, (int)no_batt_usb);
+              id(request_screen_refresh).execute();
             }
         - component.update: lipo_battery_level
         - script.execute: evaluate_power_state
@@ -256,7 +429,7 @@ sensor:
       return 0.0f;
 
 # ==============================================================================
-# LiPo USB-C Charging Heuristic Binary Sensor
+# LiPo USB-C Charging / External Power Binary Sensor
 # ==============================================================================
 binary_sensor:
   - platform: template
@@ -306,7 +479,11 @@ script:
             - logger.log: "OTA active or Stay-Awake lock is ON — skipping Deep Sleep"
           else:
             - logger.log: "Rendering sleep wake-hint overlay and entering Touch-Armed Deep Sleep (GPIO21 Wake + 15m Timer)"
-            - lambda: 'id(is_going_to_sleep) = true;'
+            - lambda: |-
+                id(is_going_to_sleep) = true;
+                // Remember pre-sleep voltage for next-wake discharge comparison
+                float v = id(lipo_voltage).state;
+                if (!isnan(v) && v >= 2.80f) id(prev_wake_vbat) = v;
             - component.update: epaper_display
             - delay: 1000ms
             - lambda: |-
@@ -323,6 +500,27 @@ script:
             - deep_sleep.enter:
                 id: deep_sleep_ctrl
                 sleep_duration: 15min
+
+  # Confirmed critical discharge: render lock screen, then 15-minute hibernate.
+  # Wakes on the 15m timer (or GPIO21 top button) and re-checks, so connecting
+  # USB-C power auto-recovers the panel without a physical reboot.
+  - id: enter_critical_hibernate
+    mode: single
+    then:
+      - component.update: epaper_display
+      - delay: 1500ms
+      - if:
+          condition:
+            lambda: |-
+              return id(critical_hibernate_latched) && !id(ota_in_progress) &&
+                     !id(ha_stay_awake_ota).state && id(power_mode_index) != 0;
+          then:
+            - logger.log: "Entering 15-minute Critical Battery Hibernate (GPIO21 Wake + 15m USB-C Auto-Recovery Check)"
+            - deep_sleep.enter:
+                id: deep_sleep_ctrl
+                sleep_duration: 15min
+          else:
+            - logger.log: "Critical Battery Hibernate cancelled (OTA / Stay-Awake / Always Online / recovered)"
 
   - id: evaluate_power_state
     mode: single
@@ -355,25 +553,86 @@ script:
             id(mode_2_sec) = 0;
           }
 
-          // 1. Critical Low-Battery Hardware Protection (< 3.32V)
-          // Renders the Critical Hibernate lock screen and sleeps indefinitely
-          if (!isnan(vbat) && vbat > 2.0f && vbat < v_crit && !id(lipo_charging).state) {
-            ESP_LOGE("power", "CRITICAL LIPO VOLTAGE (%.2fV < %.2fV) — Hibernating to protect cell!", vbat, v_crit);
-            id(epaper_display).update();
-            id(deep_sleep_ctrl).set_sleep_duration(86400000UL); // 24h emergency cut-off
-            id(deep_sleep_ctrl).begin_sleep(true);
-            return;
-          }
+          // Clears the critical confirmation window (and the lock screen if shown)
+          auto reset_critical = [&]() {
+            bool was_latched = id(critical_hibernate_latched);
+            id(crit_sample_count) = 0;
+            id(critical_hibernate_latched) = false;
+            if (was_latched) {
+              ESP_LOGI("power", "Critical Battery Hibernate cleared — restoring dashboard");
+              id(request_screen_refresh).execute();
+            }
+          };
 
-          // 2. Respect Active OTA Upload or Home Assistant OTA Stay-Awake Lock
+          // 1. Respect Active OTA Upload or Home Assistant OTA Stay-Awake Lock
+          //    (NEVER enters Critical Battery Hibernate)
           if (id(ota_in_progress) || id(ha_stay_awake_ota).state) {
+            reset_critical();
             id(deep_sleep_ctrl).prevent_deep_sleep();
             return;
           }
 
-          // 3. Mode 0: Always Online (Wi-Fi Modem Sleep) — Never enter Deep Sleep
+          // 2. Mode 0: Always Online (Wi-Fi Modem Sleep) — Never enter Deep Sleep
+          //    (NEVER enters Critical Battery Hibernate)
           if (id(power_mode_index) == 0) {
+            reset_critical();
             return;
+          }
+
+          // 3. Critical Low-Battery Protection (debounced ~60s confirmation)
+          //    Only for a real cell (>= 2.80V) that is NOT charging / USB powered.
+          bool usb_or_chg = id(is_charging_state) || id(lipo_charging).state || id(usb_power_inferred);
+          if (!isnan(vbat) && vbat >= 2.80f && vbat < v_crit && !usb_or_chg) {
+            // Hibernate already confirmed and in progress
+            if (id(critical_hibernate_latched)) {
+              return;
+            }
+
+            // Count one sample per ~10s ADC period (evaluate runs every 5s AND on each ADC update)
+            uint32_t now_ms = millis();
+            if (id(crit_sample_count) == 0 ||
+                (uint32_t)(now_ms - id(last_crit_sample_ms)) >= 8000UL) {
+              id(crit_sample_count) += 1;
+              id(last_crit_sample_ms) = now_ms;
+              if (id(crit_sample_count) == 1) {
+                id(crit_window_start_v) = vbat;
+                ESP_LOGW("power", "LiPo %.2fV < %.2fV — starting ~60s critical confirmation window", vbat, v_crit);
+              }
+            }
+
+            // Stay awake during the confirmation window so we can tell a steady
+            // USB-C powered (old/dead) cell apart from a genuinely discharging one
+            if (id(crit_sample_count) < 6) {
+              return;
+            }
+
+            bool dropped_window = (id(crit_window_start_v) - vbat) >= 0.015f;
+            bool dropped_since_sleep = (id(prev_wake_vbat) >= 2.80f &&
+                                        (id(prev_wake_vbat) - vbat) >= 0.015f);
+
+            if (!dropped_window && !dropped_since_sleep) {
+              // Voltage held flat (or rose) under ~60s of active Wi-Fi load:
+              // 5V USB-C VBUS is carrying the system load.
+              ESP_LOGW("power", "LiPo held at %.2fV (start %.2fV, prev sleep %.2fV) — USB-C power inferred, skipping hibernate",
+                       vbat, id(crit_window_start_v), id(prev_wake_vbat));
+              id(usb_power_inferred) = true;
+              id(is_charging_state) = true;
+              id(peak_lipo_v) = vbat;
+              id(crit_sample_count) = 0;
+              id(critical_hibernate_latched) = false;
+              id(request_screen_refresh).execute();
+              return;
+            }
+
+            // Confirmed discharging critical cell => 15-minute hibernate
+            ESP_LOGE("power", "CRITICAL LIPO VOLTAGE CONFIRMED (%.2fV < %.2fV, start %.2fV) — 15m hibernate to protect cell!",
+                     vbat, v_crit, id(crit_window_start_v));
+            id(prev_wake_vbat) = vbat;
+            id(critical_hibernate_latched) = true;
+            id(enter_critical_hibernate).execute();
+            return;
+          } else {
+            reset_critical();
           }
 
           // 4. Respect Awake Window:
@@ -421,7 +680,9 @@ script:
             }
           }
 
-          bool low_soc = (!isnan(soc) && soc <= soc_thresh && !id(lipo_charging).state);
+          // USB-C powered panels with weak/removed cells stay live during daytime
+          bool low_soc = (!isnan(soc) && soc <= soc_thresh && !id(lipo_charging).state &&
+                          !id(usb_power_inferred) && !isnan(vbat) && vbat >= 2.80f);
           if (in_quiet_hours || low_soc) {
             id(enter_touch_armed_deep_sleep).execute();
           }

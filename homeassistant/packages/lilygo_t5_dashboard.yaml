@@ -27,7 +27,7 @@
 #        so the ESP32-S3 parses it in C++ with zero JSON heap overhead.
 #   5. Battery & OTA Safety Automations
 #      - Sends persistent/mobile notifications at Low Battery (< 20% / < 3.68V)
-#        and Critical Hibernate (< 5% / < 3.32V), plus a 2-hour safety timeout
+#        and Critical Hibernate (2.79V < V < 3.32V, battery-only), plus a 2-hour safety timeout
 #        for OTA Stay-Awake mode so your battery never drains accidentally.
 #   6. Bedroom Dashboard (`lilygo-t5-bedroom`) helpers & automations
 #      - Dedicated `lilygo_t5_bedroom_*` input_boolean / input_select /
@@ -173,6 +173,7 @@ automation:
           minutes: 5
       - platform: numeric_state
         entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        above: 2.79   # 0.0V / < 2.80V = no LiPo connected (USB-C powered) -> no false alert
         below: 3.68
         for:
           minutes: 5
@@ -180,6 +181,10 @@ automation:
       - condition: state
         entity_id: binary_sensor.lilygo_t5_h716_dashboard_lipo_battery_charging
         state: "off"
+      # Battery-less USB-C operation reads ~0.0V: never warn about a missing cell.
+      - condition: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        above: 2.79
     action:
       - action: persistent_notification.create
         data:
@@ -197,11 +202,21 @@ automation:
     alias: "LilyGo T5 [H716] - Critical LiPo Battery Hibernate Alert (< 5% or < 3.32V)"
     description: "Urgent alert when the 1S LiPo cell hits the 3.32V cutoff and the ESP32-S3 locks into Hibernate."
     trigger:
-      - platform: numeric_state
-        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_level
-        below: 5
+      # Debounced 2 min; voltage window 2.79V < V < 3.32V so a 0.0V / unplugged
+      # battery on USB-C (no-LiPo operation) can never raise a false critical alert.
       - platform: numeric_state
         entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        above: 2.79
+        below: 3.32
+        for:
+          minutes: 2
+    condition:
+      - condition: state
+        entity_id: binary_sensor.lilygo_t5_h716_dashboard_lipo_battery_charging
+        state: "off"
+      - condition: numeric_state
+        entity_id: sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage
+        above: 2.79
         below: 3.32
     action:
       - action: persistent_notification.create
@@ -210,9 +225,10 @@ automation:
           title: "URGENT: LilyGo T5 Entered Critical Battery Hibernate"
           message: >-
             The LilyGo T5 4.7" [H716] LiPo cell reached {{ states('sensor.lilygo_t5_h716_dashboard_lipo_battery_voltage') }}V
-            (below the 3.32V safety threshold). To protect the 1S LiPo pouch cell from
-            over-discharge damage, the display has rendered its low-battery lock screen
-            and entered indefinite deep sleep. Connect a USB-C cable to recharge and wake it.
+            (below the 3.32V safety threshold) while NOT on USB-C power. To protect the 1S LiPo
+            pouch cell from over-discharge damage, the display has rendered its low-battery
+            lock screen and entered deep sleep. Plug in USB-C: it automatically recovers on its
+            next 15-minute wake check (no reboot needed), or press the GPIO21 top button to wake it immediately.
     mode: single
 
   - id: lilygo_t5_ota_stay_awake_safety_timeout
@@ -251,6 +267,7 @@ automation:
           minutes: 5
       - platform: numeric_state
         entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        above: 2.79   # 0.0V / < 2.80V = no LiPo connected (USB-C powered) -> no false alert
         below: 3.68
         for:
           minutes: 5
@@ -258,6 +275,10 @@ automation:
       - condition: state
         entity_id: binary_sensor.lilygo_t5_bedroom_lipo_battery_charging
         state: "off"
+      # Battery-less USB-C operation reads ~0.0V: never warn about a missing cell.
+      - condition: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        above: 2.79
     action:
       - action: persistent_notification.create
         data:
@@ -275,11 +296,21 @@ automation:
     alias: "LilyGo T5 Bedroom - Critical LiPo Battery Hibernate Alert (< 5% or < 3.32V)"
     description: "Urgent alert when the Bedroom 1S LiPo cell hits the 3.32V cutoff and the ESP32-S3 locks into Hibernate."
     trigger:
-      - platform: numeric_state
-        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_level
-        below: 5
+      # Debounced 2 min; voltage window 2.79V < V < 3.32V so a 0.0V / unplugged
+      # battery on USB-C (no-LiPo operation) can never raise a false critical alert.
       - platform: numeric_state
         entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        above: 2.79
+        below: 3.32
+        for:
+          minutes: 2
+    condition:
+      - condition: state
+        entity_id: binary_sensor.lilygo_t5_bedroom_lipo_battery_charging
+        state: "off"
+      - condition: numeric_state
+        entity_id: sensor.lilygo_t5_bedroom_lipo_battery_voltage
+        above: 2.79
         below: 3.32
     action:
       - action: persistent_notification.create
@@ -288,9 +319,10 @@ automation:
           title: "URGENT: LilyGo T5 Bedroom Entered Critical Battery Hibernate"
           message: >-
             The Bedroom LilyGo T5 4.7" LiPo cell reached {{ states('sensor.lilygo_t5_bedroom_lipo_battery_voltage') }}V
-            (below the 3.32V safety threshold). To protect the 1S LiPo pouch cell from
-            over-discharge damage, the display has rendered its low-battery lock screen
-            and entered indefinite deep sleep. Connect a USB-C cable to recharge and wake it.
+            (below the 3.32V safety threshold) while NOT on USB-C power. To protect the 1S LiPo
+            pouch cell from over-discharge damage, the display has rendered its low-battery
+            lock screen and entered deep sleep. Plug in USB-C: it automatically recovers on its
+            next 15-minute wake check (no reboot needed), or press the GPIO21 top button to wake it immediately.
     mode: single
 
   - id: lilygo_t5_bedroom_ota_stay_awake_safety_timeout
